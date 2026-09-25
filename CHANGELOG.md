@@ -6,6 +6,17 @@ that doesn't change a schema, a generated type, or a tool this package ships.
 
 ## Unreleased
 
+- Added `schema/notification-event.schema.json` (`NotificationEvent` generated type) — device →
+  server, but a plain HTTP POST outside the WebSocket handshake family, not a `hello`/`step`-style
+  message (no `type` discriminator; it's the only shape its endpoint accepts). This is the wire
+  shape for the design doc's Event Channel (D-20/§6.1) reaching `droidthumb-server`'s trigger
+  endpoint. **The design doc names the Event Channel's existence but never specifies a payload
+  shape for it** — this schema (`package` required; `device_id`, `sender`, `text`, `posted_at` all
+  optional) is this repo's own addition, not a transcription of an existing spec. `sender` is the
+  notification's title (contact/sender name in the common case); `text` is its body.
+
+## M4 — flow document schema
+
 - Added `schema/flow.schema.json` (`Flow`, `Param`, `FlowStep` generated types) — a saved,
   replayable sequence of steps (design doc §7.1), trimmed for the MVP: `FlowStep.op` is a closed
   enum of the 7 ops `droidthumb-server`'s M1 MCP surface exposes (`read_screen`, `tap`,

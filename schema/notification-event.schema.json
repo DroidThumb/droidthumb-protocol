@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.droidthumb.com/notification-event.json",
+  "title": "NotificationEvent",
+  "description": "device -> server, plain HTTP POST (not over the device WebSocket) from the Event Channel (design doc D-20/§6.1: `services/channel/*` observes notification events and POSTs them outbound to a configured endpoint). Not part of the hello/welcome/step/result/error handshake family, so it carries no `type` discriminator of its own — it is the only message this endpoint accepts. The exact payload shape is this repo's own addition: the design doc names the Event Channel's existence but never specified its wire shape.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["package"],
+  "properties": {
+    "device_id": { "type": "string" },
+    "package": { "type": "string", "description": "The posting app's package name, e.g. com.whatsapp." },
+    "sender": { "type": "string", "description": "The notification's title — usually the contact/sender name." },
+    "text": { "type": "string", "description": "The notification's body text." },
+    "posted_at": { "type": "string", "format": "date-time" }
+  }
+}
