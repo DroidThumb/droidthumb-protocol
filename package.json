@@ -1,0 +1,37 @@
+{
+  "name": "droidthumb-protocol",
+  "version": "0.1.0",
+  "description": "DroidThumb wire protocol and flow-step schema: JSON Schema + generated TypeScript types.",
+  "license": "MIT",
+  "private": false,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./schema/*": "./schema/*"
+  },
+  "files": [
+    "dist",
+    "schema",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "generate": "tsx scripts/generate-types.ts",
+    "build": "npm run generate && tsc",
+    "prepare": "npm run build",
+    "test": "npm run generate && tsx --test test/**/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "json-schema-to-typescript": "^15.0.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
