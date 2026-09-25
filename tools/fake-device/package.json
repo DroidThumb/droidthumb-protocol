@@ -1,0 +1,24 @@
+{
+  "name": "droidthumb-fake-device",
+  "version": "0.1.0",
+  "description": "Scriptable fake DroidThumb device: speaks the wire protocol over WebSocket, for testing droidthumb-server without a real phone.",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build",
+    "start": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "droidthumb-protocol": "file:../..",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
