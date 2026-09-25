@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.droidthumb.com/welcome.json",
+  "title": "Welcome",
+  "description": "server -> device, replies to hello once the connection is accepted. A rejected hello never gets a welcome — the connection is closed with a WS close code instead.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "accepted", "protocol_version"],
+  "properties": {
+    "type": { "const": "welcome" },
+    "accepted": { "const": true },
+    "protocol_version": { "type": "integer", "minimum": 1 },
+    "settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default_step_timeout_ms": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}
