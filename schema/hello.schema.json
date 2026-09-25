@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.droidthumb.com/hello.json",
+  "title": "Hello",
+  "description": "device -> server, sent once per connection to open the handshake.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "protocol_version", "apk_version", "device_id", "capabilities", "mode", "flow_manifest"],
+  "properties": {
+    "type": { "const": "hello" },
+    "protocol_version": { "type": "integer", "minimum": 1 },
+    "apk_version": { "type": "string" },
+    "device_id": { "type": "string" },
+    "capabilities": { "type": "array", "items": { "type": "string" } },
+    "mode": { "type": "string", "enum": ["live", "unattended"] },
+    "flow_manifest": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "version"],
+        "properties": { "id": { "type": "string" }, "version": { "type": "integer" } }
+      }
+    }
+  }
+}

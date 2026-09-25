@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.droidthumb.com/step.json",
+  "title": "Step",
+  "description": "server -> device, one per MCP tool call. `op` is deliberately an open string for M0/M1: it is one of the small subset of step-vocabulary names M1 exposes on the MCP surface, not a raw Android handler name and not (yet) the full closed step vocabulary from the design doc.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "step_id", "op"],
+  "properties": {
+    "type": { "const": "step" },
+    "step_id": { "type": "string" },
+    "op": { "type": "string" },
+    "params": { "type": "object" }
+  }
+}

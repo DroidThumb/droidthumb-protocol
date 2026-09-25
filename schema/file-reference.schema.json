@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.droidthumb.com/file-reference.json",
+  "title": "FileReference",
+  "description": "D-21. Referenced from within a step's params or a result's output wherever a value may be large. v0/M1 only ever produces the inline form (read_screen's optional screenshot); the url form exists in the schema from v0 because adding it later would be a breaking protocol change.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "mime", "data"],
+      "properties": {
+        "kind": { "const": "inline" },
+        "mime": { "type": "string" },
+        "data": { "type": "string", "contentEncoding": "base64" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "mime", "url"],
+      "properties": {
+        "kind": { "const": "url" },
+        "mime": { "type": "string" },
+        "url": { "type": "string", "format": "uri" },
+        "expires_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  ]
+}

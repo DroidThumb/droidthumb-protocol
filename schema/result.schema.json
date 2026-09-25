@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.droidthumb.com/result.json",
+  "title": "Result",
+  "description": "device -> server, success reply to a step.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "step_id"],
+  "properties": {
+    "type": { "const": "result" },
+    "step_id": { "type": "string" },
+    "output": {}
+  }
+}

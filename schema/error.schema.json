@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.droidthumb.com/error.json",
+  "title": "Error",
+  "description": "device -> server, failure reply to a step. Mutually exclusive with result for a given step_id — `type` is the real discriminator between the two.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "step_id", "code", "message"],
+  "properties": {
+    "type": { "const": "error" },
+    "step_id": { "type": "string" },
+    "code": { "type": "string" },
+    "message": { "type": "string" }
+  }
+}
