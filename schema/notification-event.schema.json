@@ -2,15 +2,68 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schema.droidthumb.com/notification-event.json",
   "title": "NotificationEvent",
-  "description": "device -> server, plain HTTP POST (not over the device WebSocket) from the Event Channel (design doc D-20/§6.1: `services/channel/*` observes notification events and POSTs them outbound to a configured endpoint). Not part of the hello/welcome/step/result/error handshake family, so it carries no `type` discriminator of its own — it is the only message this endpoint accepts. The exact payload shape is this repo's own addition: the design doc names the Event Channel's existence but never specified its wire shape.",
+  "description": "device -> server, plain HTTP POST (not over the device WebSocket) from the Event Channel (design doc D-20/§6.1: `services/channel/*` observes notification events and POSTs them outbound to a configured endpoint). Not part of the hello/welcome/step/result/error handshake family, so it carries no `type` discriminator distinguishing it from other messages the way those do — but it does carry `type: \"notification\"` as an event-kind tag, since droidthumb-android's Event Channel envelope (`ChannelEvent`) is a generic `{type, timestamp, data}` shape built to carry other event kinds later, even though only notification events exist in v0. Reconciled 2026-09-25 against droidthumb-android's actual `services/channel/*` output (ChannelEvent + ChannelEventFactory.notification) after this schema's first version was invented without seeing that code — see droidthumb-server's decisions-log for why the shape changed and droidthumb-protocol's CHANGELOG for what changed.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["package"],
+  "required": ["type", "timestamp", "data"],
   "properties": {
-    "device_id": { "type": "string" },
-    "package": { "type": "string", "description": "The posting app's package name, e.g. com.whatsapp." },
-    "sender": { "type": "string", "description": "The notification's title — usually the contact/sender name." },
-    "text": { "type": "string", "description": "The notification's body text." },
-    "posted_at": { "type": "string", "format": "date-time" }
+    "type": { "const": "notification" },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the app dispatched this event (not necessarily when the notification was posted — see data.timestamp for that)."
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eventType",
+        "notificationId",
+        "packageName",
+        "appName",
+        "title",
+        "text",
+        "bigText",
+        "subText",
+        "timestamp",
+        "isOngoing",
+        "isClearable",
+        "category",
+        "groupKey",
+        "actions"
+      ],
+      "properties": {
+        "eventType": { "type": "string", "enum": ["posted", "removed"] },
+        "notificationId": { "type": "string" },
+        "packageName": { "type": "string", "description": "The posting app's package name, e.g. com.whatsapp." },
+        "appName": { "type": "string" },
+        "title": {
+          "type": ["string", "null"],
+          "description": "Usually the contact/sender name in a messaging app."
+        },
+        "text": { "type": ["string", "null"] },
+        "bigText": { "type": ["string", "null"] },
+        "subText": { "type": ["string", "null"] },
+        "timestamp": { "type": "integer", "description": "Epoch milliseconds the notification itself was posted." },
+        "isOngoing": { "type": "boolean" },
+        "isClearable": { "type": "boolean" },
+        "category": { "type": ["string", "null"] },
+        "groupKey": { "type": ["string", "null"] },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["actionId", "index", "title", "acceptsText"],
+            "properties": {
+              "actionId": { "type": "string" },
+              "index": { "type": "integer" },
+              "title": { "type": "string" },
+              "acceptsText": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    }
   }
 }
