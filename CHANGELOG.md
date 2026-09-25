@@ -6,6 +6,24 @@ that doesn't change a schema, a generated type, or a tool this package ships.
 
 ## Unreleased
 
+- **Reconciled `schema/notification-event.schema.json` against `droidthumb-android`'s actual
+  Event Channel output (M2).** The M1-era version below was invented without that code in front of
+  it — a flat `{package, device_id?, sender?, text?, posted_at?}` object. Having now read
+  `droidthumb-android`'s `services/channel/*` (`ChannelEvent`/`ChannelEventFactory`), the real wire
+  shape is `{type: "notification", timestamp, data: {...}}` — a generic envelope the app already
+  uses so other event kinds can be added later without a new top-level shape, wrapping a rich
+  per-notification payload (`eventType`, `notificationId`, `packageName`, `appName`, `title`,
+  `text`, `bigText`, `subText`, `timestamp` as epoch ms, `isOngoing`, `isClearable`, `category`,
+  `groupKey`, `actions[]`). The app's shape was judged not "genuinely wrong" — richer than the
+  server's trigger-matching currently needs, but a reasonable, already-built design, not a bug — so
+  the server's schema changes to match it rather than the other way round. `package`/`sender`/`text`
+  (the server's own trigger-matching vocabulary, unrelated to the wire shape) are unaffected: they
+  now read from `data.packageName`/`data.title`/`data.text` instead of top-level fields.
+  `device_id`/`posted_at` are dropped — the app never sent them. See `droidthumb-server`'s
+  decisions-log for the full reasoning.
+
+## M5 — notification trigger endpoint (superseded above, kept for history)
+
 - Added `schema/notification-event.schema.json` (`NotificationEvent` generated type) — device →
   server, but a plain HTTP POST outside the WebSocket handshake family, not a `hello`/`step`-style
   message (no `type` discriminator; it's the only shape its endpoint accepts). This is the wire
