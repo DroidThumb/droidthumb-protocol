@@ -6,12 +6,26 @@ that doesn't change a schema, a generated type, or a tool this package ships.
 
 ## Unreleased
 
+- Added `schema/flow.schema.json` (`Flow`, `Param`, `FlowStep` generated types) — a saved,
+  replayable sequence of steps (design doc §7.1), trimmed for the MVP: `FlowStep.op` is a closed
+  enum of the 7 ops `droidthumb-server`'s M1 MCP surface exposes (`read_screen`, `tap`,
+  `type_text`, `scroll_find`, `key`, `launch_app`, `wait_until`) rather than the full §7.2
+  vocabulary — no branching, `call_flow`, `request_draft`, or signing yet. `params` declares named
+  variables (`name`, `type`, `required`, `secret`); a step's own `params` object may reference one
+  by an exact whole-string `"{{name}}"` value (not general string interpolation — see
+  `droidthumb-server`'s decisions log for why). `droidthumb-server`'s `save_flow` produces these;
+  `run_flow` replays them server-side, one step at a time, against the device — there is no
+  on-device flow cache or executor yet (that's the design doc's device-side plan for later; MVP
+  explicitly allows server-driven replay instead).
+
+## M1 — fake device
+
 - Added `tools/fake-device`: a scriptable stand-in device for `droidthumb-server`'s tests. Not a
   protocol change — internal to this repo's test story — but recorded here since it's the
   reference implementation of client-side handshake behaviour (`hello` → awaits `welcome`, closes
   on rejection) other clients (eventually `droidthumb-android`) should match.
 
-## 0.1.0 — M0 protocol skeleton
+## M0 — protocol skeleton
 
 - Six wire-message schemas added under `schema/`: `hello`, `welcome`, `step`, `result`, `error`,
   `file-reference`. Every wire message (`hello`, `welcome`, `step`, `result`, `error`) carries a
