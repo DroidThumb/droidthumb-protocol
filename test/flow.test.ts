@@ -45,6 +45,34 @@ test("flow: a step op outside the 7-op closed set fails", async () => {
   assert.equal(ok, false, "expected an unsupported op to fail validation");
 });
 
+test("flow: meta.fragile and meta.fragile_reason validate", async () => {
+  const validate = await loadValidator();
+  const ok = validate({
+    schema_version: 1,
+    id: "flow_1",
+    name: "n",
+    version: 1,
+    params: [],
+    steps: [{ id: "s1", op: "tap", params: { at: { x: 10, y: 20 } } }],
+    meta: { fragile: true, fragile_reason: "s1 has no selector, coordinate-only" },
+  });
+  assert.equal(ok, true, `expected a valid flow: ${JSON.stringify(validate.errors)}`);
+});
+
+test("flow: an unknown meta field fails", async () => {
+  const validate = await loadValidator();
+  const ok = validate({
+    schema_version: 1,
+    id: "flow_1",
+    name: "n",
+    version: 1,
+    params: [],
+    steps: [{ id: "s1", op: "tap", params: {} }],
+    meta: { unknown_field: true },
+  });
+  assert.equal(ok, false, "expected an unknown meta field to fail validation");
+});
+
 test("flow: missing required top-level field fails", async () => {
   const validate = await loadValidator();
   const ok = validate({

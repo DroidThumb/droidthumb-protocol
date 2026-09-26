@@ -28,7 +28,15 @@
       "items": { "$ref": "#/$defs/flow_step" }
     },
     "meta": {
-      "type": "object"
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fragile": {
+          "type": "boolean",
+          "description": "True when at least one step's params ended up coordinate-only (`at`, no `selector`) — the device found nothing identifiable under the tapped point when the flow was saved, so that step can't self-heal on replay the way a selector-based tap can (M3, droidthumb-server/docs/decisions-log.md)."
+        },
+        "fragile_reason": { "type": "string" }
+      }
     }
   },
   "$defs": {

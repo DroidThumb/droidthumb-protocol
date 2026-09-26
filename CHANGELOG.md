@@ -6,6 +6,12 @@ that doesn't change a schema, a generated type, or a tool this package ships.
 
 ## Unreleased
 
+- **`schema/flow.schema.json`'s `meta` field is now typed** (`{fragile?: boolean,
+  fragile_reason?: string}` instead of an untyped `{}`). `fragile: true` means `save_flow` found at
+  least one step whose params ended up coordinate-only (`at`, no `selector`) — the device found
+  nothing identifiable under the tapped point when the session was recorded, so that step can't
+  self-heal on replay the way a selector-based `tap` now can. Part of M3's "selectors from
+  coordinates" fix — see `droidthumb-server`'s decisions-log.
 - **Reconciled `schema/notification-event.schema.json` against `droidthumb-android`'s actual
   Event Channel output (M2).** The M1-era version below was invented without that code in front of
   it — a flat `{package, device_id?, sender?, text?, posted_at?}` object. Having now read
