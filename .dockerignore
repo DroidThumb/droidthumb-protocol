@@ -1,0 +1,6 @@
+node_modules
+dist
+src/generated
+*.tsbuildinfo
+tools/fake-device/node_modules
+tools/fake-device/dist
