@@ -81,7 +81,7 @@ test("hello: wrong type discriminator fails", async () => {
 
 // --- welcome ---------------------------------------------------------------
 
-test("welcome: valid example passes", async () => {
+test("welcome: valid example passes (claimed: true)", async () => {
   const validate = await loadValidator("welcome.schema.json");
   assertValid(
     validate,
@@ -89,9 +89,37 @@ test("welcome: valid example passes", async () => {
       type: "welcome",
       accepted: true,
       protocol_version: 1,
+      claimed: true,
       settings: { default_step_timeout_ms: 30000 },
     },
     "a well-formed welcome",
+  );
+});
+
+test("welcome: valid example passes (claimed: false, unclaimed device)", async () => {
+  const validate = await loadValidator("welcome.schema.json");
+  assertValid(
+    validate,
+    {
+      type: "welcome",
+      accepted: true,
+      protocol_version: 1,
+      claimed: false,
+    },
+    "a well-formed welcome for an unclaimed device",
+  );
+});
+
+test("welcome: missing claimed fails", async () => {
+  const validate = await loadValidator("welcome.schema.json");
+  assertInvalid(
+    validate,
+    {
+      type: "welcome",
+      accepted: true,
+      protocol_version: 1,
+    },
+    "a welcome missing claimed",
   );
 });
 
@@ -103,9 +131,52 @@ test("welcome: accepted: false fails (a soft-reject is not this shape yet)", asy
       type: "welcome",
       accepted: false,
       protocol_version: 1,
+      claimed: false,
     },
     "a welcome with accepted: false",
   );
+});
+
+// --- challenge / challenge_response ---------------------------------------
+
+test("challenge: valid example passes", async () => {
+  const validate = await loadValidator("challenge.schema.json");
+  assertValid(validate, { type: "challenge", nonce: "cmFuZG9tLW5vbmNlLWJ5dGVz" }, "a well-formed challenge");
+});
+
+test("challenge: missing nonce fails", async () => {
+  const validate = await loadValidator("challenge.schema.json");
+  assertInvalid(validate, { type: "challenge" }, "a challenge missing nonce");
+});
+
+test("challenge_response: valid example passes", async () => {
+  const validate = await loadValidator("challenge-response.schema.json");
+  assertValid(
+    validate,
+    { type: "challenge_response", signature: "MEUCIQDx...base64der...AiA=" },
+    "a well-formed challenge_response",
+  );
+});
+
+test("challenge_response: wrong type discriminator fails", async () => {
+  const validate = await loadValidator("challenge-response.schema.json");
+  assertInvalid(validate, { type: "challenge", signature: "abc" }, "a challenge_response with type: challenge");
+});
+
+// --- device-registration ---------------------------------------------------
+
+test("device-registration: valid example passes", async () => {
+  const validate = await loadValidator("device-registration.schema.json");
+  assertValid(
+    validate,
+    { device_id: "pixel-8-abc123", public_key: "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE...base64der..." },
+    "a well-formed device-registration",
+  );
+});
+
+test("device-registration: missing public_key fails", async () => {
+  const validate = await loadValidator("device-registration.schema.json");
+  assertInvalid(validate, { device_id: "pixel-8-abc123" }, "a device-registration missing public_key");
 });
 
 // --- step --------------------------------------------------------------

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.droidthumb.com/challenge.json",
+  "title": "Challenge",
+  "description": "server -> device, sent after a schema-valid hello for a device_id the server has a registered public key for. nonce is base64-encoded random bytes the device must sign with its Keystore private key (device-registration.schema.json) and return in a challenge_response. Not sent at all if device_id is unknown — the server closes the connection instead (see droidthumb-server's ws-server.ts close codes).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "nonce"],
+  "properties": {
+    "type": { "const": "challenge" },
+    "nonce": { "type": "string", "minLength": 1 }
+  }
+}

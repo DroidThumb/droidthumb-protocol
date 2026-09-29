@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.droidthumb.com/challenge-response.json",
+  "title": "ChallengeResponse",
+  "description": "device -> server, replies to a challenge. signature is the base64-encoded ASN.1 DER ECDSA signature (SHA256withECDSA, matching Android Keystore's default EC signing output) over the raw bytes of the challenge's nonce after base64-decoding it — not over the nonce's base64 text. The server verifies against the public key stored at registration (device-registration.schema.json) for this connection's device_id and either sends welcome or closes the connection.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "signature"],
+  "properties": {
+    "type": { "const": "challenge_response" },
+    "signature": { "type": "string", "minLength": 1 }
+  }
+}

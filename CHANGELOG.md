@@ -6,6 +6,20 @@ that doesn't change a schema, a generated type, or a tool this package ships.
 
 ## Unreleased
 
+- **Device identity handshake (D-27, `droidthumb-server` design doc v0.12): `hello` → `welcome` is now
+  `hello` → `challenge` → `challenge_response` → `welcome`.** Two new WS message schemas —
+  `schema/challenge.schema.json` (server → device, a base64 `nonce`) and
+  `schema/challenge-response.schema.json` (device → server, a base64 ASN.1 DER ECDSA signature over
+  the nonce's raw bytes, `SHA256withECDSA`, matching Android Keystore's default EC signing output) —
+  and one new plain-HTTP-POST schema, `schema/device-registration.schema.json` (device → server,
+  `{device_id, public_key}`, the base64 X.509 SPKI DER of an EC P-256 key), sent once before a
+  device's first WebSocket connection. `hello` itself is unchanged. `welcome` gains a new required
+  `claimed: boolean` field: `false` means the connection is accepted (the device can `hello`/report
+  results) but the server won't relay a `run`/`step` command to it until an authenticated account
+  claims the device — an unclaimed device is connected, not driveable. A device whose `device_id` was
+  never registered, or whose challenge signature doesn't verify, never gets a `welcome` at all — the
+  connection is closed with a WS close code, the same pattern `hello` rejection already used (see
+  `droidthumb-server`'s `ws-server.ts` for the actual close-code values).
 - **`schema/flow.schema.json`'s `meta` field is now typed** (`{fragile?: boolean,
   fragile_reason?: string}` instead of an untyped `{}`). `fragile: true` means `save_flow` found at
   least one step whose params ended up coordinate-only (`at`, no `selector`) — the device found
