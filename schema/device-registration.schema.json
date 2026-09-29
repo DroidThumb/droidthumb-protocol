@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.droidthumb.com/device-registration.json",
+  "title": "DeviceRegistration",
+  "description": "device -> server, a plain HTTP POST (not a WS message, no type discriminator — same family as notification-event.schema.json) made once, before the device's first WebSocket connection, to register the Keystore key pair it generated at first launch. public_key is the base64-encoded X.509 SubjectPublicKeyInfo (SPKI) DER bytes of an EC (P-256) public key. Re-registering the same device_id with the same public_key is idempotent; registering a different public_key under an already-registered device_id is rejected (key rotation is not supported yet — a build that needs it registers a new device_id instead).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["device_id", "public_key"],
+  "properties": {
+    "device_id": { "type": "string", "minLength": 1 },
+    "public_key": { "type": "string", "minLength": 1 }
+  }
+}
