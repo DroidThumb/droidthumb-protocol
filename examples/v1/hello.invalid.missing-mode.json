@@ -1,0 +1,8 @@
+{
+  "type": "hello",
+  "protocol_version": 1,
+  "apk_version": "1.2.3",
+  "device_id": "pixel-8-abc123",
+  "capabilities": [],
+  "flow_manifest": []
+}

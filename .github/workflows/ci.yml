@@ -8,13 +8,26 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: GitHub re-points that label to a new Ubuntu release on its own
+    # schedule (October 2026), which would change the runner under this repo unannounced.
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            tools/fake-device/package-lock.json
       - run: npm ci
       - run: npm run build
       - run: npm test
+      # The fake device is part of the protocol's contract tests: it must be able to speak every
+      # supported protocol_version (its own tests fail otherwise).
+      - name: Fake device — build and test
+        working-directory: tools/fake-device
+        run: |
+          npm ci
+          npm run build
+          npm test

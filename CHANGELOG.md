@@ -6,6 +6,36 @@ that doesn't change a schema, a generated type, or a tool this package ships.
 
 ## Unreleased
 
+- **Version reporting and update info (`droidthumb-server` plan 03 milestone 2, design doc v0.14).**
+  Still `protocol_version` 1 — every change below is additive and optional, so an app built before
+  it (which sends none of it) keeps working unchanged.
+  - **`hello` gains two optional fields:** `android_version` (integer ≥ 1, the Android API level —
+    `Build.VERSION.SDK_INT`) and `device_model` (string, 1–128 chars — `Build.MANUFACTURER` +
+    `Build.MODEL`, diagnostic only). The app's own version is the **existing** `apk_version`
+    (semver, `BuildConfig.VERSION_NAME`); no separate `app_version` field was added, since renaming
+    or duplicating the one the shipped app already sends would gain nothing. The server logs all of
+    these, plus `protocol_version`, per connection.
+  - **`welcome` gains three optional fields:** `latest_app_version`, `minimum_supported_app_version`
+    (both non-empty strings) and `download_url` (`https://` only). The app compares its own version
+    to the first two to decide between an update banner and a blocking screen (plan 03 milestone 4);
+    `download_url` is where it fetches `latest_app_version`. The server always sends all three once
+    configured; an app must tolerate their absence.
+  - **Per-version contract examples: `examples/v<N>/`.** One directory per supported
+    `protocol_version`, each holding a valid and an invalid example of every message
+    (`<message>.<valid|invalid>[.<label>].json`), plus `examples/protocol-versions.json`
+    (`{"current": 1, "supported": [1]}`) — the single source of truth for which versions
+    `droidthumb-server` accepts, published as `droidthumb-protocol/examples/*`.
+    `test/protocol-versions.test.ts` validates every example against the schemas and enforces the
+    N/N−1 policy (at most two consecutive supported versions, the newest being `current`).
+    `examples/v1/hello.valid.legacy.json` and `welcome.valid.legacy.json` pin the pre-M2 shapes as
+    still valid. See `examples/README.md` for the never-edit-a-supported-version's-examples rule.
+  - **Fake device speaks any supported version.** `tools/fake-device` gains per-version `hello`
+    dialects (`src/dialects.ts`), `androidVersion`/`deviceModel`/`legacyHello` options, `connect()` callable again after `close()` (a reconnect with the same identity), and a default
+    `protocolVersion` taken from `DROIDTHUMB_FAKE_PROTOCOL_VERSION` (else `current`) so a consumer's
+    whole test suite can be run once per supported version. Its own tests fail if a supported
+    version has no dialect, and check the `hello` it puts on the wire against the schema and the
+    version's example.
+
 - **`welcome`'s `claimed` field removed (D-29, `droidthumb-server` design doc v0.13).** Added days
   earlier (below) to say whether a device had an owning account; v0.13 removes accounts from v1
   entirely, so there's nothing left for a device to be claimed *by* — `claimed` is now meaningless

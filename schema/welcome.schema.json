@@ -10,6 +10,9 @@
     "type": { "const": "welcome" },
     "accepted": { "const": true },
     "protocol_version": { "type": "integer", "minimum": 1 },
+    "latest_app_version": { "type": "string", "minLength": 1, "description": "Newest app version the server knows of; the app compares it to its own to decide on an update banner." },
+    "minimum_supported_app_version": { "type": "string", "minLength": 1, "description": "Oldest app version the server still supports; an older app shows a blocking update screen." },
+    "download_url": { "type": "string", "pattern": "^https://", "description": "Where to download latest_app_version (https only)." },
     "settings": {
       "type": "object",
       "additionalProperties": false,

@@ -12,11 +12,13 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./schema/*": "./schema/*"
+    "./schema/*": "./schema/*",
+    "./examples/*": "./examples/*"
   },
   "files": [
     "dist",
     "schema",
+    "examples",
     "README.md",
     "LICENSE"
   ],
