@@ -30,7 +30,7 @@ that doesn't change a schema, a generated type, or a tool this package ships.
     `examples/v1/hello.valid.legacy.json` and `welcome.valid.legacy.json` pin the pre-M2 shapes as
     still valid. See `examples/README.md` for the never-edit-a-supported-version's-examples rule.
   - **Fake device speaks any supported version.** `tools/fake-device` gains per-version `hello`
-    dialects (`src/dialects.ts`), `androidVersion`/`deviceModel`/`legacyHello` options, and a default
+    dialects (`src/dialects.ts`), `androidVersion`/`deviceModel`/`legacyHello` options, `connect()` callable again after `close()` (a reconnect with the same identity), and a default
     `protocolVersion` taken from `DROIDTHUMB_FAKE_PROTOCOL_VERSION` (else `current`) so a consumer's
     whole test suite can be run once per supported version. Its own tests fail if a supported
     version has no dialect, and check the `hello` it puts on the wire against the schema and the
