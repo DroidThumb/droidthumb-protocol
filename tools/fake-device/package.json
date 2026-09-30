@@ -9,7 +9,8 @@
   "scripts": {
     "build": "tsc",
     "prepare": "npm run build",
-    "start": "tsx src/cli.ts"
+    "start": "tsx src/cli.ts",
+    "test": "tsx --test test/**/*.test.ts"
   },
   "dependencies": {
     "droidthumb-protocol": "file:../..",
@@ -18,6 +19,7 @@
   "devDependencies": {
     "@types/node": "^22.10.2",
     "@types/ws": "^8.5.13",
+    "ajv": "^8.17.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }

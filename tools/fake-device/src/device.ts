@@ -1,6 +1,7 @@
 import { WebSocket } from "ws";
 import { randomUUID, generateKeyPairSync, sign as cryptoSign, type KeyObject } from "node:crypto";
-import type { Hello, Welcome, Step, Result, Error as ErrorMessage } from "droidthumb-protocol";
+import type { Welcome, Step, Result, Error as ErrorMessage } from "droidthumb-protocol";
+import { buildHello, defaultProtocolVersion } from "./dialects.js";
 import { defaultCannedResponses, type CannedResponses } from "./canned.js";
 import type { Override } from "./scenarios.js";
 
@@ -8,8 +9,21 @@ export interface FakeDeviceOptions {
   url: string;
   deviceId?: string;
   apkVersion?: string;
+  /** Android API level reported in `hello`. Default 34. */
+  androidVersion?: number;
+  /** Hardware model reported in `hello`. Default "Fake Device". */
+  deviceModel?: string;
+  /**
+   * Speak `hello` the way an app built before android_version/device_model existed did (omit
+   * them). Such apps are still in the field, so the server must keep accepting them.
+   */
+  legacyHello?: boolean;
   mode?: "live" | "unattended";
   capabilities?: string[];
+  /**
+   * The protocol_version to speak. Defaults to `DROIDTHUMB_FAKE_PROTOCOL_VERSION` if set, else the
+   * protocol's current version (`examples/protocol-versions.json`).
+   */
   protocolVersion?: number;
   /** Send a message other than `hello` first, or omit fields — for negative handshake tests. */
   helloOverride?: Record<string, unknown>;
@@ -116,15 +130,15 @@ export class FakeDevice {
       this.ws = ws;
 
       ws.once("open", () => {
-        const hello: Hello = {
-          type: "hello",
-          protocol_version: this.options.protocolVersion ?? 1,
-          apk_version: this.options.apkVersion ?? "0.0.0-fake",
-          device_id: this.deviceId,
+        const hello = buildHello(this.options.protocolVersion ?? defaultProtocolVersion(), {
+          deviceId: this.deviceId,
+          apkVersion: this.options.apkVersion ?? "0.0.0-fake",
+          androidVersion: this.options.androidVersion ?? 34,
+          deviceModel: this.options.deviceModel ?? "Fake Device",
           capabilities: this.options.capabilities ?? [],
           mode: this.options.mode ?? "live",
-          flow_manifest: [],
-        };
+          legacy: this.options.legacyHello ?? false,
+        });
         const payload = this.options.helloOverride ?? hello;
         ws.send(JSON.stringify(payload));
       });
