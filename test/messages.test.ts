@@ -81,7 +81,7 @@ test("hello: wrong type discriminator fails", async () => {
 
 // --- welcome ---------------------------------------------------------------
 
-test("welcome: valid example passes (claimed: true)", async () => {
+test("welcome: valid example passes", async () => {
   const validate = await loadValidator("welcome.schema.json");
   assertValid(
     validate,
@@ -89,14 +89,13 @@ test("welcome: valid example passes (claimed: true)", async () => {
       type: "welcome",
       accepted: true,
       protocol_version: 1,
-      claimed: true,
       settings: { default_step_timeout_ms: 30000 },
     },
     "a well-formed welcome",
   );
 });
 
-test("welcome: valid example passes (claimed: false, unclaimed device)", async () => {
+test("welcome: settings is optional", async () => {
   const validate = await loadValidator("welcome.schema.json");
   assertValid(
     validate,
@@ -104,22 +103,8 @@ test("welcome: valid example passes (claimed: false, unclaimed device)", async (
       type: "welcome",
       accepted: true,
       protocol_version: 1,
-      claimed: false,
     },
-    "a well-formed welcome for an unclaimed device",
-  );
-});
-
-test("welcome: missing claimed fails", async () => {
-  const validate = await loadValidator("welcome.schema.json");
-  assertInvalid(
-    validate,
-    {
-      type: "welcome",
-      accepted: true,
-      protocol_version: 1,
-    },
-    "a welcome missing claimed",
+    "a well-formed welcome with no settings",
   );
 });
 
@@ -131,7 +116,6 @@ test("welcome: accepted: false fails (a soft-reject is not this shape yet)", asy
       type: "welcome",
       accepted: false,
       protocol_version: 1,
-      claimed: false,
     },
     "a welcome with accepted: false",
   );
