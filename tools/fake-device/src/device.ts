@@ -123,7 +123,11 @@ export class FakeDevice {
     this.overrides.set(op, list);
   }
 
-  private async register(): Promise<void> {
+  /**
+   * Registers this device's key (POST /devices/register) without opening a WebSocket — a phone
+   * that is registered but offline. Idempotent; `connect()` calls it for you.
+   */
+  async register(): Promise<void> {
     const registerUrl = this.options.registerUrl ?? deriveRegisterUrl(this.options.url);
     if (this.registered) return; // a reconnect: the key is already registered
     const res = await fetch(registerUrl, {
