@@ -6,6 +6,12 @@ that doesn't change a schema, a generated type, or a tool this package ships.
 
 ## Unreleased
 
+- **`welcome`'s `claimed` field removed (D-29, `droidthumb-server` design doc v0.13).** Added days
+  earlier (below) to say whether a device had an owning account; v0.13 removes accounts from v1
+  entirely, so there's nothing left for a device to be claimed *by* — `claimed` is now meaningless
+  and its `required` entry is gone along with it. It returns, LATER, if/when accounts do (D-29).
+  `welcome`'s only required fields now are `type`, `accepted`, `protocol_version`, matching the
+  original M0 shape before device identity was added.
 - **Device identity handshake (D-27, `droidthumb-server` design doc v0.12): `hello` → `welcome` is now
   `hello` → `challenge` → `challenge_response` → `welcome`.** Two new WS message schemas —
   `schema/challenge.schema.json` (server → device, a base64 `nonce`) and

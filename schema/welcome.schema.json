@@ -5,15 +5,11 @@
   "description": "server -> device, replies to hello once the connection is accepted (which now means: a valid hello, followed by a successful challenge/challenge_response, per challenge.schema.json). A rejected hello, or a failed challenge, never gets a welcome — the connection is closed with a WS close code instead.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["type", "accepted", "protocol_version", "claimed"],
+  "required": ["type", "accepted", "protocol_version"],
   "properties": {
     "type": { "const": "welcome" },
     "accepted": { "const": true },
     "protocol_version": { "type": "integer", "minimum": 1 },
-    "claimed": {
-      "type": "boolean",
-      "description": "Whether this device_id currently has an owning account (server-side devices.owner_user_id is set). false means the connection is accepted and the device can send hello/results, but the server will refuse to relay a run or step command to it until an authenticated app claims it."
-    },
     "settings": {
       "type": "object",
       "additionalProperties": false,

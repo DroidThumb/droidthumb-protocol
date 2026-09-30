@@ -55,7 +55,6 @@ export class FakeDevice {
   readonly deviceId: string;
   private welcomed = false;
   private closedInfo: CloseInfo | null = null;
-  private claimedState: boolean | null = null;
 
   constructor(private readonly options: FakeDeviceOptions) {
     this.deviceId = options.deviceId ?? `fake-${randomUUID()}`;
@@ -67,10 +66,6 @@ export class FakeDevice {
 
   get isWelcomed(): boolean {
     return this.welcomed;
-  }
-
-  get claimed(): boolean | null {
-    return this.claimedState;
   }
 
   get closeInfo(): CloseInfo | null {
@@ -155,7 +150,6 @@ export class FakeDevice {
           }
           if (msg.type === "welcome") {
             this.welcomed = true;
-            this.claimedState = (msg as Welcome & { claimed: boolean }).claimed;
             resolve(msg as Welcome);
           } else {
             reject(new Error(`expected challenge or welcome, got type: ${msg.type}`));
