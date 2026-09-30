@@ -28,3 +28,12 @@ This repo doesn't restate the spec — read it in the sibling `droidthumb-server
   are derived from it, not the other way round.
 - Keep this package buildable as a `file:` dependency: don't add anything to `dependencies` that
   isn't needed at runtime by a consumer, and don't assume a monorepo tool is available.
+- Every schema/protocol change needs a `CHANGELOG.md` entry (see that file's own header).
+
+## Deploy/review workflow (`droidthumb-server` plan 03 milestone 1 onward)
+
+One PR, never merged by whoever opened it — the founder reviews and merges. This repo's own CI has
+no staging/APK step (it's a schema/codegen package, nothing to deploy) — `droidthumb-server`'s CI
+checks out this repo's `main` as a sibling for its own staging/production builds, so a
+`droidthumb-server` PR that depends on an unmerged protocol PR won't reflect it until the protocol
+PR is merged first. Merge order matters when a change spans both repos.
