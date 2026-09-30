@@ -6,6 +6,49 @@ that doesn't change a schema, a generated type, or a tool this package ships.
 
 ## Unreleased
 
+- **Device ids are derived from the device's public key, not chosen by the device (plan 03
+  milestone 3 follow-up).** `device_id` = `"dt_"` + the lowercase hex SHA-256 of the DER bytes of the
+  device's X.509 SubjectPublicKeyInfo public key (the bytes that base64-decode from `public_key`) —
+  64 hex characters after the prefix. Nobody can register, or take over, another phone's id without
+  its private key. Test vectors (three real P-256 keys and their ids):
+  `examples/device-id-vectors.json`; an app's derivation must reproduce them byte for byte.
+  - **`POST /devices/register`:** a device now sends only `{public_key}`. `device_id` in the request
+    is **optional and deprecated**: if present it must equal the derived id or the server answers
+    400. `public_key` must be a valid EC P-256 SPKI key (400 otherwise). The response's `device_id`
+    is the derived id, and it is what the device puts in `hello`. Making `device_id` optional is
+    additive, so `protocol_version` stays 1 and the existing v1 registration example stays valid
+    (schema-valid; the server rejects that example's made-up id, which is not derived). The 409 for
+    "same id, different key" can no longer occur and is gone from the response docs.
+  - **`hello.device_id`:** unchanged on the wire (still a plain string, so the pre-existing v1
+    examples stay valid); the server accepts only an id derived from a registered key. Ids
+    registered before this change (arbitrary strings) are refused on connect (close 4002): they
+    must re-register.
+  - **Fake device:** the id is derived from its generated key (`deviceId` is read-only); the old
+    `deviceId` option is gone. `helloDeviceId` overrides only what `hello` says, for negative tests.
+- **Per-phone secret connector URL (`droidthumb-server` plan 03 milestone 3, D-29).** Still
+  `protocol_version` 1: everything below is a new optional message or field, so the app already in
+  the field is unaffected by it.
+  - **`POST /devices/register` now has a documented response schema**,
+    `schema/device-registration-response.schema.json` (`DeviceRegistrationResponse`):
+    `{device_id, connector_url?}`. `connector_url` — the phone's secret MCP URL,
+    `https://mcp.droidthumb.com/d/<secret>/mcp`, secret included — is present **only when this call
+    created the device**, and is never returned again; the server keeps only a hash of the secret.
+    The app must store it. A repeat registration with the same key still returns 200 but without
+    `connector_url`; a device that has lost it recovers with `regenerate_secret` (below). New status
+    code: **429** when the registration rate limit (per source IP) is hit, with a `Retry-After`
+    header. `device-registration.schema.json` (the request) is unchanged.
+  - **New WebSocket message pair for regenerating the secret:** `schema/regenerate-secret.schema.json`
+    (device → server, `{type: "regenerate_secret"}`, no other fields) and
+    `schema/secret-regenerated.schema.json` (server → device, `{type: "secret_regenerated",
+    connector_url}`), sent on an established connection, i.e. after `welcome`. No extra
+    authentication field: the connection *is* the authentication — the device has just proved it
+    holds its Keystore key in the `challenge`/`challenge_response` exchange. The old URL stops
+    working the moment the server processes the request. Rate-limited per device; an over-limit
+    request is ignored (no reply), so a client should time out rather than wait forever.
+  - **Fake device:** `connectorUrl` (set from the registration response and from every
+    `regenerateSecret()`), `regenerateSecret()`.
+  - Examples for all three schemas added under `examples/v1/`.
+
 - **Version reporting and update info (`droidthumb-server` plan 03 milestone 2, design doc v0.14).**
   Still `protocol_version` 1 — every change below is additive and optional, so an app built before
   it (which sends none of it) keeps working unchanged.

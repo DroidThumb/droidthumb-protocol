@@ -1,5 +1,5 @@
 import { WebSocket } from "ws";
-import { randomUUID, generateKeyPairSync, sign as cryptoSign, type KeyObject } from "node:crypto";
+import { generateKeyPairSync, createHash, sign as cryptoSign, type KeyObject } from "node:crypto";
 import type { Welcome, Step, Result, Error as ErrorMessage } from "droidthumb-protocol";
 import { buildHello, defaultProtocolVersion } from "./dialects.js";
 import { defaultCannedResponses, type CannedResponses } from "./canned.js";
@@ -7,7 +7,14 @@ import type { Override } from "./scenarios.js";
 
 export interface FakeDeviceOptions {
   url: string;
-  deviceId?: string;
+  /**
+   * What `hello` claims as device_id, for negative tests only (e.g. an id that isn't derived from
+   * the key). Default: the id derived from this device's own key, which is the only one a server
+   * accepts. The registration request never carries an id.
+   */
+  helloDeviceId?: string;
+  /** Also send the (deprecated) device_id in the registration request — for negative tests. */
+  registrationDeviceId?: string;
   apkVersion?: string;
   /** Android API level reported in `hello`. Default 34. */
   androidVersion?: number;
@@ -69,14 +76,18 @@ export class FakeDevice {
   readonly deviceId: string;
   private welcomed = false;
   private registered = false;
+  private connectorUrlValue: string | null = null;
+  private pendingRegenerate: { resolve: (url: string) => void; reject: (err: Error) => void; timer: NodeJS.Timeout } | null = null;
   private closedInfo: CloseInfo | null = null;
 
   constructor(private readonly options: FakeDeviceOptions) {
-    this.deviceId = options.deviceId ?? `fake-${randomUUID()}`;
     this.canned = defaultCannedResponses();
     const { publicKey, privateKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
     this.privateKey = privateKey;
-    this.publicKeyBase64 = publicKey.export({ type: "spki", format: "der" }).toString("base64");
+    const der = publicKey.export({ type: "spki", format: "der" });
+    this.publicKeyBase64 = der.toString("base64");
+    // The id is a function of the key (examples/device-id-vectors.json), not a choice.
+    this.deviceId = `dt_${createHash("sha256").update(der).digest("hex")}`;
   }
 
   get isWelcomed(): boolean {
@@ -87,6 +98,33 @@ export class FakeDevice {
     return this.closedInfo;
   }
 
+  /**
+   * The phone's secret MCP connector URL: set from the registration response the one time the
+   * server returns it (a device's first registration), and from every `regenerateSecret()` after.
+   * Null if this device registered before and never learned it.
+   */
+  get connectorUrl(): string | null {
+    return this.connectorUrlValue;
+  }
+
+  /**
+   * Asks the server (over the authenticated connection) for a new connector secret; resolves with
+   * the new URL. The previous URL stops working as soon as the server has processed the request.
+   * Rejects if there is no reply within `timeoutMs` (the server ignores rate-limited requests).
+   */
+  regenerateSecret(timeoutMs = 5000): Promise<string> {
+    const ws = this.ws;
+    if (!this.welcomed || !ws) return Promise.reject(new Error("not connected"));
+    return new Promise<string>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingRegenerate = null;
+        reject(new Error("no secret_regenerated reply (rate limited, or the server ignored it)"));
+      }, timeoutMs);
+      this.pendingRegenerate = { resolve, reject, timer };
+      ws.send(JSON.stringify({ type: "regenerate_secret" }));
+    });
+  }
+
   /** Queue a one-time behaviour override for the next `step` with this op. */
   queue(op: string, override: Override): void {
     const list = this.overrides.get(op) ?? [];
@@ -94,18 +132,27 @@ export class FakeDevice {
     this.overrides.set(op, list);
   }
 
-  private async register(): Promise<void> {
+  /**
+   * Registers this device's key (POST /devices/register) without opening a WebSocket — a phone
+   * that is registered but offline. Idempotent; `connect()` calls it for you.
+   */
+  async register(): Promise<void> {
     const registerUrl = this.options.registerUrl ?? deriveRegisterUrl(this.options.url);
     if (this.registered) return; // a reconnect: the key is already registered
     const res = await fetch(registerUrl, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ device_id: this.deviceId, public_key: this.publicKeyBase64 }),
+      body: JSON.stringify({
+        ...(this.options.registrationDeviceId !== undefined ? { device_id: this.options.registrationDeviceId } : {}),
+        public_key: this.publicKeyBase64,
+      }),
     });
     if (!res.ok) {
       throw new Error(`device registration failed: ${res.status} ${await res.text()}`);
     }
     this.registered = true;
+    const body = (await res.json().catch(() => ({}))) as { connector_url?: unknown };
+    if (typeof body.connector_url === "string") this.connectorUrlValue = body.connector_url;
   }
 
   private signChallenge(nonceBase64: string): string {
@@ -138,7 +185,7 @@ export class FakeDevice {
 
       ws.once("open", () => {
         const hello = buildHello(this.options.protocolVersion ?? defaultProtocolVersion(), {
-          deviceId: this.deviceId,
+          deviceId: this.options.helloDeviceId ?? this.deviceId,
           apkVersion: this.options.apkVersion ?? "0.0.0-fake",
           androidVersion: this.options.androidVersion ?? 34,
           deviceModel: this.options.deviceModel ?? "Fake Device",
@@ -179,6 +226,12 @@ export class FakeDevice {
         }
         if (msg.type === "step") {
           void this.handleStep(msg as Step);
+        } else if (msg.type === "secret_regenerated" && this.pendingRegenerate) {
+          const pending = this.pendingRegenerate;
+          this.pendingRegenerate = null;
+          clearTimeout(pending.timer);
+          this.connectorUrlValue = msg.connector_url as string;
+          pending.resolve(msg.connector_url as string);
         }
       });
     });

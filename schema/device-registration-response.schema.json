@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.droidthumb.com/device-registration-response.json",
+  "title": "DeviceRegistrationResponse",
+  "description": "server -> device, the 200 body of POST /devices/register (device-registration.schema.json). `connector_url` is the phone's secret MCP connector URL — present only when this call created the device, and never returned again: the server keeps only a hash of the secret inside it. A device that registers again with the same key (200, no `connector_url`) and has lost the URL recovers by connecting and sending `regenerate_secret`. Other statuses: 400 invalid body (including a public_key that is not an EC P-256 SPKI key, or a device_id that is not the one derived from it), 429 registration rate limit (Retry-After header).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["device_id"],
+  "properties": {
+    "device_id": { "type": "string", "minLength": 1, "description": "The id derived from the registered key: \"dt_\" + lowercase hex SHA-256 of the SPKI DER bytes. The device uses this value in hello." },
+    "connector_url": { "type": "string", "pattern": "^https?://", "description": "The full URL to paste into an MCP client, secret included. Treat as a credential." }
+  }
+}
