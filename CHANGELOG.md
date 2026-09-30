@@ -6,6 +6,25 @@ that doesn't change a schema, a generated type, or a tool this package ships.
 
 ## Unreleased
 
+- **Device ids are derived from the device's public key, not chosen by the device (plan 03
+  milestone 3 follow-up).** `device_id` = `"dt_"` + the lowercase hex SHA-256 of the DER bytes of the
+  device's X.509 SubjectPublicKeyInfo public key (the bytes that base64-decode from `public_key`) —
+  64 hex characters after the prefix. Nobody can register, or take over, another phone's id without
+  its private key. Test vectors (three real P-256 keys and their ids):
+  `examples/device-id-vectors.json`; an app's derivation must reproduce them byte for byte.
+  - **`POST /devices/register`:** a device now sends only `{public_key}`. `device_id` in the request
+    is **optional and deprecated**: if present it must equal the derived id or the server answers
+    400. `public_key` must be a valid EC P-256 SPKI key (400 otherwise). The response's `device_id`
+    is the derived id, and it is what the device puts in `hello`. Making `device_id` optional is
+    additive, so `protocol_version` stays 1 and the existing v1 registration example stays valid
+    (schema-valid; the server rejects that example's made-up id, which is not derived). The 409 for
+    "same id, different key" can no longer occur and is gone from the response docs.
+  - **`hello.device_id`:** unchanged on the wire (still a plain string, so the pre-existing v1
+    examples stay valid); the server accepts only an id derived from a registered key. Ids
+    registered before this change (arbitrary strings) are refused on connect (close 4002): they
+    must re-register.
+  - **Fake device:** the id is derived from its generated key (`deviceId` is read-only); the old
+    `deviceId` option is gone. `helloDeviceId` overrides only what `hello` says, for negative tests.
 - **Per-phone secret connector URL (`droidthumb-server` plan 03 milestone 3, D-29).** Still
   `protocol_version` 1: everything below is a new optional message or field, so the app already in
   the field is unaffected by it.

@@ -1,5 +1,5 @@
 import { WebSocket } from "ws";
-import { randomUUID, generateKeyPairSync, sign as cryptoSign, type KeyObject } from "node:crypto";
+import { generateKeyPairSync, createHash, sign as cryptoSign, type KeyObject } from "node:crypto";
 import type { Welcome, Step, Result, Error as ErrorMessage } from "droidthumb-protocol";
 import { buildHello, defaultProtocolVersion } from "./dialects.js";
 import { defaultCannedResponses, type CannedResponses } from "./canned.js";
@@ -7,7 +7,14 @@ import type { Override } from "./scenarios.js";
 
 export interface FakeDeviceOptions {
   url: string;
-  deviceId?: string;
+  /**
+   * What `hello` claims as device_id, for negative tests only (e.g. an id that isn't derived from
+   * the key). Default: the id derived from this device's own key, which is the only one a server
+   * accepts. The registration request never carries an id.
+   */
+  helloDeviceId?: string;
+  /** Also send the (deprecated) device_id in the registration request — for negative tests. */
+  registrationDeviceId?: string;
   apkVersion?: string;
   /** Android API level reported in `hello`. Default 34. */
   androidVersion?: number;
@@ -74,11 +81,13 @@ export class FakeDevice {
   private closedInfo: CloseInfo | null = null;
 
   constructor(private readonly options: FakeDeviceOptions) {
-    this.deviceId = options.deviceId ?? `fake-${randomUUID()}`;
     this.canned = defaultCannedResponses();
     const { publicKey, privateKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
     this.privateKey = privateKey;
-    this.publicKeyBase64 = publicKey.export({ type: "spki", format: "der" }).toString("base64");
+    const der = publicKey.export({ type: "spki", format: "der" });
+    this.publicKeyBase64 = der.toString("base64");
+    // The id is a function of the key (examples/device-id-vectors.json), not a choice.
+    this.deviceId = `dt_${createHash("sha256").update(der).digest("hex")}`;
   }
 
   get isWelcomed(): boolean {
@@ -133,7 +142,10 @@ export class FakeDevice {
     const res = await fetch(registerUrl, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ device_id: this.deviceId, public_key: this.publicKeyBase64 }),
+      body: JSON.stringify({
+        ...(this.options.registrationDeviceId !== undefined ? { device_id: this.options.registrationDeviceId } : {}),
+        public_key: this.publicKeyBase64,
+      }),
     });
     if (!res.ok) {
       throw new Error(`device registration failed: ${res.status} ${await res.text()}`);
@@ -173,7 +185,7 @@ export class FakeDevice {
 
       ws.once("open", () => {
         const hello = buildHello(this.options.protocolVersion ?? defaultProtocolVersion(), {
-          deviceId: this.deviceId,
+          deviceId: this.options.helloDeviceId ?? this.deviceId,
           apkVersion: this.options.apkVersion ?? "0.0.0-fake",
           androidVersion: this.options.androidVersion ?? 34,
           deviceModel: this.options.deviceModel ?? "Fake Device",

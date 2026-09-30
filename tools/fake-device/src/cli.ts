@@ -4,7 +4,6 @@ const url = process.env["DEVICE_SERVER_URL"] ?? "ws://127.0.0.1:4001/device";
 const protocolVersion = process.env["DEVICE_PROTOCOL_VERSION"];
 const device = new FakeDevice({
   url,
-  deviceId: process.env["DEVICE_ID"],
   apkVersion: process.env["DEVICE_APK_VERSION"],
   ...(protocolVersion ? { protocolVersion: Number.parseInt(protocolVersion, 10) } : {}),
   ...(process.env["DEVICE_LEGACY_HELLO"] === "1" ? { legacyHello: true } : {}),

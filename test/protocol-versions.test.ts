@@ -143,3 +143,29 @@ test("v1 keeps a legacy hello and welcome (sent before the M2 fields existed) th
   const legacyHello = examples.find((e) => e.file === "hello.valid.legacy.json");
   assert.ok(legacyHello && !("android_version" in legacyHello.body) && !("device_model" in legacyHello.body));
 });
+
+// --- device ids are derived from the key (plan 03 milestone 3 follow-up) --------------------------
+
+test("examples/device-id-vectors.json: every vector's device_id is dt_ + hex SHA-256 of the key's DER bytes", async () => {
+  const { createHash } = await import("node:crypto");
+  const file = (await readJson(path.join(examplesDir, "device-id-vectors.json"))) as {
+    vectors: { public_key: string; device_id: string }[];
+  };
+  assert.ok(file.vectors.length >= 3);
+  const ids = new Set<string>();
+  for (const v of file.vectors) {
+    const der = Buffer.from(v.public_key, "base64");
+    assert.equal(v.device_id, `dt_${createHash("sha256").update(der).digest("hex")}`);
+    assert.match(v.device_id, /^dt_[0-9a-f]{64}$/);
+    ids.add(v.device_id);
+  }
+  assert.equal(ids.size, file.vectors.length, "vectors must be distinct");
+});
+
+test("device-registration: a request is just public_key; device_id is optional (deprecated), public_key required", async () => {
+  const validate = await validatorFor("device-registration");
+  assert.equal(validate({ public_key: "abc" }), true);
+  assert.equal(validate({ device_id: "x", public_key: "abc" }), true);
+  assert.equal(validate({ device_id: "x" }), false);
+  assert.equal(validate({ public_key: "abc", label: "phone" }), false);
+});
