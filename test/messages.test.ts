@@ -315,3 +315,40 @@ test("file-reference: mixing inline and url fields fails (matches neither oneOf 
     "a file-reference with both data and url",
   );
 });
+
+// --- hello / welcome: the version-reporting fields (plan 03 milestone 2) ---------
+
+test("hello: android_version and device_model are accepted; a non-positive or empty value fails", async () => {
+  const validate = await loadValidator("hello.schema.json");
+  const base = {
+    type: "hello",
+    protocol_version: 1,
+    apk_version: "1.0.0",
+    device_id: "d",
+    capabilities: [],
+    mode: "live",
+    flow_manifest: [],
+  };
+  assertValid(validate, { ...base, android_version: 34, device_model: "Google Pixel 8" }, "hello with both fields");
+  assertInvalid(validate, { ...base, android_version: 0 }, "android_version 0");
+  assertInvalid(validate, { ...base, device_model: "" }, "empty device_model");
+  assertInvalid(validate, { ...base, device_model: "x".repeat(129) }, "over-long device_model");
+});
+
+test("welcome: the update fields are optional, and download_url must be https", async () => {
+  const validate = await loadValidator("welcome.schema.json");
+  const base = { type: "welcome", accepted: true, protocol_version: 1 };
+  assertValid(validate, base, "welcome without update fields");
+  assertValid(
+    validate,
+    {
+      ...base,
+      latest_app_version: "1.3.0",
+      minimum_supported_app_version: "1.0.0",
+      download_url: "https://example.com/app.apk",
+    },
+    "welcome with update fields",
+  );
+  assertInvalid(validate, { ...base, download_url: "http://example.com/app.apk" }, "http download_url");
+  assertInvalid(validate, { ...base, latest_app_version: "" }, "empty latest_app_version");
+});
