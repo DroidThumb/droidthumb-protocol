@@ -111,3 +111,15 @@ test("DROIDTHUMB_FAKE_PROTOCOL_VERSION sets the default; without it the default 
     else process.env["DROIDTHUMB_FAKE_PROTOCOL_VERSION"] = saved;
   }
 });
+
+test("connect() can be called again after close(), reusing the same identity", async () => {
+  await withStubServer(async (url, hellos) => {
+    const device = new FakeDevice({ url, deviceId: "phone-1" });
+    await device.connect();
+    device.close();
+    await device.connect();
+    device.close();
+    assert.equal(hellos.length, 2);
+    assert.deepEqual(hellos.map((h) => h["device_id"]), ["phone-1", "phone-1"]);
+  });
+});

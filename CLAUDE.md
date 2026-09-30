@@ -37,3 +37,13 @@ no staging/APK step (it's a schema/codegen package, nothing to deploy) — `droi
 checks out this repo's `main` as a sibling for its own staging/production builds, so a
 `droidthumb-server` PR that depends on an unmerged protocol PR won't reflect it until the protocol
 PR is merged first. Merge order matters when a change spans both repos.
+
+## Protocol versions and examples
+
+`examples/protocol-versions.json` is the single source of truth for which `protocol_version`s exist
+and which the server accepts (`droidthumb-server` reads it; policy is design doc §9.8 there: N and
+N−1 only). One `examples/v<N>/` directory per supported version, never edited to make a schema change
+pass — see `examples/README.md`. A schema change an already-shipped app would fail on needs a new
+`protocol_version`, not an edit. Any new schema for a wire message needs examples in every supported
+version's directory (and an entry in the required list in `test/protocol-versions.test.ts`), and the
+fake device (`tools/fake-device`) must be able to speak every supported version.

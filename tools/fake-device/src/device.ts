@@ -68,6 +68,7 @@ export class FakeDevice {
   private readonly publicKeyBase64: string;
   readonly deviceId: string;
   private welcomed = false;
+  private registered = false;
   private closedInfo: CloseInfo | null = null;
 
   constructor(private readonly options: FakeDeviceOptions) {
@@ -95,6 +96,7 @@ export class FakeDevice {
 
   private async register(): Promise<void> {
     const registerUrl = this.options.registerUrl ?? deriveRegisterUrl(this.options.url);
+    if (this.registered) return; // a reconnect: the key is already registered
     const res = await fetch(registerUrl, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -103,6 +105,7 @@ export class FakeDevice {
     if (!res.ok) {
       throw new Error(`device registration failed: ${res.status} ${await res.text()}`);
     }
+    this.registered = true;
   }
 
   private signChallenge(nonceBase64: string): string {
@@ -115,12 +118,16 @@ export class FakeDevice {
   }
 
   /**
-   * Registers (unless `skipRegistration`), connects, sends `hello`, answers the server's
+   * Registers (once, unless `skipRegistration`), connects, sends `hello`, answers the server's
    * `challenge` with a real signature, and resolves with `welcome` once accepted. Rejects if the
    * connection closes (or the WS upgrade itself fails, or registration fails) before a `welcome`
    * arrives.
    */
   async connect(): Promise<Welcome> {
+    // Callable again after close() — a phone reconnects with the same identity. Registration is
+    // skipped the second time (same key), and handshake state starts fresh.
+    this.welcomed = false;
+    this.closedInfo = null;
     if (!this.options.skipRegistration) {
       await this.register();
     }
