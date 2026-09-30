@@ -123,3 +123,48 @@ test("connect() can be called again after close(), reusing the same identity", a
     assert.deepEqual(hellos.map((h) => h["device_id"]), ["phone-1", "phone-1"]);
   });
 });
+
+test("registration returns the connector URL once; regenerateSecret() replaces it over the open connection", async () => {
+  const registered: string[] = [];
+  const server = http.createServer((req, res) => {
+    if (req.method === "POST" && req.url === "/devices/register") {
+      registered.push("x");
+      const body = registered.length === 1 ? { device_id: "p", connector_url: "https://example.test/d/dtk_first/mcp" } : { device_id: "p" };
+      res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(body));
+      return;
+    }
+    res.writeHead(404).end();
+  });
+  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => "droidthumb.v1" });
+  server.on("upgrade", (req, socket, head) => wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws)));
+  wss.on("connection", (ws) => {
+    ws.on("message", (raw) => {
+      const msg = JSON.parse(String(raw)) as Record<string, unknown>;
+      if (msg["type"] === "hello") ws.send(JSON.stringify({ type: "challenge", nonce: "AAAA" }));
+      else if (msg["type"] === "challenge_response") ws.send(JSON.stringify({ type: "welcome", accepted: true, protocol_version: 1 }));
+      else if (msg["type"] === "regenerate_secret") {
+        ws.send(JSON.stringify({ type: "secret_regenerated", connector_url: "https://example.test/d/dtk_second/mcp" }));
+      }
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  const addr = server.address();
+  if (typeof addr !== "object" || addr === null) throw new Error("expected AddressInfo");
+  try {
+    const device = new FakeDevice({ url: `ws://127.0.0.1:${addr.port}/device` });
+    await device.connect();
+    assert.equal(device.connectorUrl, "https://example.test/d/dtk_first/mcp");
+    assert.equal(await device.regenerateSecret(), "https://example.test/d/dtk_second/mcp");
+    assert.equal(device.connectorUrl, "https://example.test/d/dtk_second/mcp");
+    device.close();
+  } finally {
+    wss.close();
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+test("regenerateSecret() rejects when not connected", async () => {
+  const device = new FakeDevice({ url: "ws://127.0.0.1:1/device" });
+  await assert.rejects(device.regenerateSecret(), /not connected/);
+});

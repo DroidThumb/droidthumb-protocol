@@ -15,6 +15,7 @@ device
   .then((welcome) => {
     console.log(`[fake-device] connected to ${url}, device_id=${device.deviceId}`);
     console.log("[fake-device] welcome:", welcome);
+    if (device.connectorUrl) console.log("[fake-device] connector URL received (not printed: it is a credential)");
     if (process.env["DEVICE_EXIT_AFTER_WELCOME"] === "1") {
       device.close();
     }

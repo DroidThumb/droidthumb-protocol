@@ -21,6 +21,9 @@ const REQUIRED_MESSAGES = [
   "result",
   "error",
   "notification-event",
+  "device-registration-response",
+  "regenerate-secret",
+  "secret-regenerated",
 ];
 
 interface ProtocolVersions {

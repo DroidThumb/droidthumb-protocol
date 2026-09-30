@@ -69,6 +69,8 @@ export class FakeDevice {
   readonly deviceId: string;
   private welcomed = false;
   private registered = false;
+  private connectorUrlValue: string | null = null;
+  private pendingRegenerate: { resolve: (url: string) => void; reject: (err: Error) => void; timer: NodeJS.Timeout } | null = null;
   private closedInfo: CloseInfo | null = null;
 
   constructor(private readonly options: FakeDeviceOptions) {
@@ -85,6 +87,33 @@ export class FakeDevice {
 
   get closeInfo(): CloseInfo | null {
     return this.closedInfo;
+  }
+
+  /**
+   * The phone's secret MCP connector URL: set from the registration response the one time the
+   * server returns it (a device's first registration), and from every `regenerateSecret()` after.
+   * Null if this device registered before and never learned it.
+   */
+  get connectorUrl(): string | null {
+    return this.connectorUrlValue;
+  }
+
+  /**
+   * Asks the server (over the authenticated connection) for a new connector secret; resolves with
+   * the new URL. The previous URL stops working as soon as the server has processed the request.
+   * Rejects if there is no reply within `timeoutMs` (the server ignores rate-limited requests).
+   */
+  regenerateSecret(timeoutMs = 5000): Promise<string> {
+    const ws = this.ws;
+    if (!this.welcomed || !ws) return Promise.reject(new Error("not connected"));
+    return new Promise<string>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingRegenerate = null;
+        reject(new Error("no secret_regenerated reply (rate limited, or the server ignored it)"));
+      }, timeoutMs);
+      this.pendingRegenerate = { resolve, reject, timer };
+      ws.send(JSON.stringify({ type: "regenerate_secret" }));
+    });
   }
 
   /** Queue a one-time behaviour override for the next `step` with this op. */
@@ -106,6 +135,8 @@ export class FakeDevice {
       throw new Error(`device registration failed: ${res.status} ${await res.text()}`);
     }
     this.registered = true;
+    const body = (await res.json().catch(() => ({}))) as { connector_url?: unknown };
+    if (typeof body.connector_url === "string") this.connectorUrlValue = body.connector_url;
   }
 
   private signChallenge(nonceBase64: string): string {
@@ -179,6 +210,12 @@ export class FakeDevice {
         }
         if (msg.type === "step") {
           void this.handleStep(msg as Step);
+        } else if (msg.type === "secret_regenerated" && this.pendingRegenerate) {
+          const pending = this.pendingRegenerate;
+          this.pendingRegenerate = null;
+          clearTimeout(pending.timer);
+          this.connectorUrlValue = msg.connector_url as string;
+          pending.resolve(msg.connector_url as string);
         }
       });
     });
