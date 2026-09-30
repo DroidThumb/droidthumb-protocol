@@ -1,0 +1,20 @@
+{
+  "type": "notification",
+  "timestamp": "2026-09-30T12:00:00Z",
+  "data": {
+    "eventType": "posted",
+    "notificationId": "n-1",
+    "packageName": "com.whatsapp",
+    "appName": "WhatsApp",
+    "title": "Alex",
+    "text": "hello",
+    "bigText": null,
+    "subText": null,
+    "timestamp": 1790000000000,
+    "isOngoing": false,
+    "isClearable": true,
+    "category": "msg",
+    "groupKey": null,
+    "actions": [{ "actionId": "reply", "index": 0, "title": "Reply", "acceptsText": true }]
+  }
+}
