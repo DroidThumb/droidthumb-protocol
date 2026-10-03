@@ -6,6 +6,21 @@ that doesn't change a schema, a generated type, or a tool this package ships.
 
 ## Unreleased
 
+- **New message triple for claiming a device into an account (design doc D-33, v1.1 — accounts
+  return).** Still `protocol_version` 1: all three are new, additive message types.
+  - **`claim_account`** (device → server): sent on an already-challenge-verified connection, the
+    same pattern `regenerate_secret` uses — the connection itself proves possession of the device's
+    Keystore key, so the message carries only `account_token` (a short-lived, single-use token the
+    app's own backend-facing session mints right after Google sign-in completes), never a device
+    identifier of its own.
+  - **`claimed`** (server → device): `{account_id}`, sent on a successful claim (new, or an
+    idempotent re-claim by the account that already owns the device).
+  - **`claim_rejected`** (server → device): `{reason: "already_claimed" | "invalid_token"}`, sent
+    when a different account already owns the device, or `account_token` is invalid/expired/
+    already used.
+  - New required examples in every supported version's directory
+    (`test/protocol-versions.test.ts`'s `REQUIRED_MESSAGES`); the fake device will need to speak
+    this triple before `droidthumb-server`'s own tests against it can exercise the claim flow.
 - **Device ids are derived from the device's public key, not chosen by the device (plan 03
   milestone 3 follow-up).** `device_id` = `"dt_"` + the lowercase hex SHA-256 of the DER bytes of the
   device's X.509 SubjectPublicKeyInfo public key (the bytes that base64-decode from `public_key`) —

@@ -335,6 +335,46 @@ test("hello: android_version and device_model are accepted; a non-positive or em
   assertInvalid(validate, { ...base, device_model: "x".repeat(129) }, "over-long device_model");
 });
 
+// --- claim_account / claimed / claim_rejected (design doc D-33) ---------------------------
+
+test("claim_account: valid example passes", async () => {
+  const validate = await loadValidator("claim-account.schema.json");
+  assertValid(
+    validate,
+    { type: "claim_account", account_token: "clt_abc123" },
+    "a well-formed claim_account",
+  );
+});
+
+test("claim_account: missing account_token fails", async () => {
+  const validate = await loadValidator("claim-account.schema.json");
+  assertInvalid(validate, { type: "claim_account" }, "a claim_account missing account_token");
+});
+
+test("claimed: valid example passes", async () => {
+  const validate = await loadValidator("claimed.schema.json");
+  assertValid(validate, { type: "claimed", account_id: "acc_abc123" }, "a well-formed claimed");
+});
+
+test("claimed: missing account_id fails", async () => {
+  const validate = await loadValidator("claimed.schema.json");
+  assertInvalid(validate, { type: "claimed" }, "a claimed missing account_id");
+});
+
+test("claim_rejected: valid example passes", async () => {
+  const validate = await loadValidator("claim-rejected.schema.json");
+  assertValid(
+    validate,
+    { type: "claim_rejected", reason: "already_claimed" },
+    "a well-formed claim_rejected",
+  );
+});
+
+test("claim_rejected: unknown reason fails", async () => {
+  const validate = await loadValidator("claim-rejected.schema.json");
+  assertInvalid(validate, { type: "claim_rejected", reason: "nope" }, "a claim_rejected with an unknown reason");
+});
+
 test("welcome: the update fields are optional, and download_url must be https", async () => {
   const validate = await loadValidator("welcome.schema.json");
   const base = { type: "welcome", accepted: true, protocol_version: 1 };

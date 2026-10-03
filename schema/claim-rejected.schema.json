@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.droidthumb.com/claim-rejected.json",
+  "title": "ClaimRejected",
+  "description": "server -> device, the reply to a rejected claim_account: the device is already claimed by a different account (\"already_claimed\"), or account_token was invalid, expired, or already used (\"invalid_token\").",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "reason"],
+  "properties": {
+    "type": { "const": "claim_rejected" },
+    "reason": { "enum": ["already_claimed", "invalid_token"] }
+  }
+}

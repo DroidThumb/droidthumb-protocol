@@ -78,6 +78,8 @@ export class FakeDevice {
   private registered = false;
   private connectorUrlValue: string | null = null;
   private pendingRegenerate: { resolve: (url: string) => void; reject: (err: Error) => void; timer: NodeJS.Timeout } | null = null;
+  private claimedAccountIdValue: string | null = null;
+  private pendingClaim: { resolve: (accountId: string) => void; reject: (err: Error) => void; timer: NodeJS.Timeout } | null = null;
   private closedInfo: CloseInfo | null = null;
 
   constructor(private readonly options: FakeDeviceOptions) {
@@ -122,6 +124,29 @@ export class FakeDevice {
       }, timeoutMs);
       this.pendingRegenerate = { resolve, reject, timer };
       ws.send(JSON.stringify({ type: "regenerate_secret" }));
+    });
+  }
+
+  /** The account_id this device was last successfully claimed by, or null if never claimed. */
+  get claimedAccountId(): string | null {
+    return this.claimedAccountIdValue;
+  }
+
+  /**
+   * Sends `claim_account` over the authenticated connection (design doc D-33) and resolves with the
+   * `account_id` from `claimed`. Rejects with the rejection reason on `claim_rejected`, or on no
+   * reply within `timeoutMs`.
+   */
+  claimAccount(accountToken: string, timeoutMs = 5000): Promise<string> {
+    const ws = this.ws;
+    if (!this.welcomed || !ws) return Promise.reject(new Error("not connected"));
+    return new Promise<string>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingClaim = null;
+        reject(new Error("no claimed/claim_rejected reply within timeout"));
+      }, timeoutMs);
+      this.pendingClaim = { resolve, reject, timer };
+      ws.send(JSON.stringify({ type: "claim_account", account_token: accountToken }));
     });
   }
 
@@ -232,6 +257,17 @@ export class FakeDevice {
           clearTimeout(pending.timer);
           this.connectorUrlValue = msg.connector_url as string;
           pending.resolve(msg.connector_url as string);
+        } else if (msg.type === "claimed" && this.pendingClaim) {
+          const pending = this.pendingClaim;
+          this.pendingClaim = null;
+          clearTimeout(pending.timer);
+          this.claimedAccountIdValue = msg.account_id as string;
+          pending.resolve(msg.account_id as string);
+        } else if (msg.type === "claim_rejected" && this.pendingClaim) {
+          const pending = this.pendingClaim;
+          this.pendingClaim = null;
+          clearTimeout(pending.timer);
+          pending.reject(new Error(`claim_rejected: ${msg.reason as string}`));
         }
       });
     });
