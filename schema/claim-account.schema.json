@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.droidthumb.com/claim-account.json",
+  "title": "ClaimAccount",
+  "description": "device -> server, sent on an established (challenge-verified) connection to claim this device for a signed-in account (design doc D-33). The connection itself proves possession of the device's Keystore key, the same pattern regenerate_secret uses, so the message carries no device identifier of its own. account_token is a short-lived, single-use token the app's own backend-facing session mints right after Google sign-in completes (POST /v1/accounts/claim-token) — not the OAuth access token itself, so a leaked claim token can't be replayed for anything beyond the one claim it was minted for.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "account_token"],
+  "properties": {
+    "type": { "const": "claim_account" },
+    "account_token": { "type": "string", "minLength": 1 }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.droidthumb.com/claimed.json",
+  "title": "Claimed",
+  "description": "server -> device, the reply to a successful claim_account: either a new claim, or an idempotent re-claim by the same account that already owns this device.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "account_id"],
+  "properties": {
+    "type": { "const": "claimed" },
+    "account_id": { "type": "string", "minLength": 1 }
+  }
+}

@@ -24,6 +24,9 @@ const REQUIRED_MESSAGES = [
   "device-registration-response",
   "regenerate-secret",
   "secret-regenerated",
+  "claim-account",
+  "claimed",
+  "claim-rejected",
 ];
 
 interface ProtocolVersions {
