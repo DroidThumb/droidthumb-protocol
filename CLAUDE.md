@@ -32,11 +32,16 @@ This repo doesn't restate the spec — read it in the sibling `droidthumb-server
 
 ## Deploy/review workflow (`droidthumb-server` plan 03 milestone 1 onward)
 
-One PR, never merged by whoever opened it — the founder reviews and merges. This repo's own CI has
-no staging/APK step (it's a schema/codegen package, nothing to deploy) — `droidthumb-server`'s CI
+One PR per change. The main session may merge its own PR once CI is fully green, nothing was
+skipped, and (where the change is testable there) it's been verified on staging — this repo's own
+CI has no staging/APK step (it's a schema/codegen package, nothing to deploy), so that last
+condition never applies here; a green CI is enough. Subagents and review forks never push, open
+PRs, or merge — they report back to the main session, which merges. `droidthumb-server`'s CI
 checks out this repo's `main` as a sibling for its own staging/production builds, so a
 `droidthumb-server` PR that depends on an unmerged protocol PR won't reflect it until the protocol
-PR is merged first. Merge order matters when a change spans both repos.
+PR is merged first — **merge order across a cross-repo change is always protocol → server →
+android.** Still stop and ask the founder before: switching production's auth mode, anything that
+deletes production data, or anything that needs `sudo`.
 
 - **Never start new feature work while an earlier PR in this repo is still unmerged, unless the
   founder asks for it.** Finish and merge what's open first. If asked to work ahead anyway, say so
