@@ -32,11 +32,8 @@ This repo doesn't restate the spec — read it in the sibling `droidthumb-server
 
 ## Deploy/review workflow (`droidthumb-server` plan 03 milestone 1 onward)
 
-One PR per change. The main session may merge its own PR once CI is fully green, nothing was
-skipped, and (where the change is testable there) it's been verified on staging — this repo's own
-CI has no staging/APK step (it's a schema/codegen package, nothing to deploy), so that last
-condition never applies here; a green CI is enough. Subagents and review forks never push, open
-PRs, or merge — they report back to the main session, which merges. `droidthumb-server`'s CI
+One PR per change. Agents stop at local commits on a feature branch: never push, open PRs or
+merge — report back; the founder pushes, opens the PR and merges once CI is green. `droidthumb-server`'s CI
 checks out this repo's `main` as a sibling for its own staging/production builds, so a
 `droidthumb-server` PR that depends on an unmerged protocol PR won't reflect it until the protocol
 PR is merged first — **merge order across a cross-repo change is always protocol → server →
