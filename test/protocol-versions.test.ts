@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readdir, readFile } from "node:fs/promises";
+import { access, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
@@ -105,6 +105,26 @@ test("every supported version has a valid and an invalid example of every requir
           `v${version} is missing a ${kind} example of ${message}`,
         );
       }
+    }
+  }
+});
+
+test("every example's message name has a matching schema file", async () => {
+  const { supported } = await loadVersions();
+  for (const version of supported) {
+    for (const example of await loadExamples(version)) {
+      const schemaFile = path.join(schemaDir, `${example.message}.schema.json`);
+      const missing = await access(schemaFile).then(
+        () => false,
+        (err: NodeJS.ErrnoException) => {
+          if (err.code === "ENOENT") return true;
+          throw err;
+        },
+      );
+      assert.ok(
+        !missing,
+        `v${version}/${example.file} has no schema/${example.message}.schema.json (typo in example file name?)`,
+      );
     }
   }
 });
