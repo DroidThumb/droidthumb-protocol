@@ -387,7 +387,10 @@ export class FakeDevice {
         const output = behaviour.output !== undefined ? behaviour.output : this.canned[step.op]?.(step.params);
         // A canned responder can answer with an error (device_locked, submit_unsupported) instead
         // of a result: shape { error: { code, message } }.
-        const err = (output as { error?: { code?: string; message?: string } } | undefined)?.error;
+        const err =
+          typeof output === "object" && output !== null && "error" in output
+            ? (output as { error: { code?: string; message?: string } }).error
+            : undefined;
         if (err && typeof err.code === "string") {
           this.send({ type: "error", step_id: step.step_id, code: err.code, message: err.message ?? err.code });
           return;

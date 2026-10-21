@@ -116,10 +116,11 @@ test("close code 4004 (replaced) is exported, and 4000-4004 are all distinct", a
 
 // --- type_text append/submit, read_screen locked, device_locked ----------------------------
 
-test("result: read_screen's locked flag is a required boolean in the documented output shape", async () => {
+test("result: read_screen's locked flag is fine in output (free-form per op)", async () => {
   const validate = await loadValidator("result.schema.json");
   assertValid(validate, { type: "result", step_id: "s-1", output: { tree: "root", locked: false } }, "a result with locked");
   assertValid(validate, { type: "result", step_id: "s-1", output: { tapped: true } }, "a result without a locked flag");
+  assertValid(validate, { type: "result", step_id: "s-1", output: "done" }, "a result with a plain-string output");
 });
 
 test("error: device_locked and submit_unsupported are valid codes (code stays an open string)", async () => {

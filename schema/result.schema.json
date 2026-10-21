@@ -9,12 +9,6 @@
   "properties": {
     "type": { "const": "result" },
     "step_id": { "type": "string" },
-    "output": {
-      "type": "object",
-      "additionalProperties": true,
-      "properties": {
-        "locked": { "type": "boolean", "description": "True when the phone is locked — a locked screen yields no usable tree." }
-      }
-    }
+    "output": {}
   }
 }
