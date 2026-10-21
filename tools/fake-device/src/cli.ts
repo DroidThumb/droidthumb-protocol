@@ -6,7 +6,6 @@ const device = new FakeDevice({
   url,
   apkVersion: process.env["DEVICE_APK_VERSION"],
   ...(protocolVersion ? { protocolVersion: Number.parseInt(protocolVersion, 10) } : {}),
-  ...(process.env["DEVICE_LEGACY_HELLO"] === "1" ? { legacyHello: true } : {}),
 });
 
 device

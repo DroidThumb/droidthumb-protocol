@@ -27,6 +27,10 @@ const REQUIRED_MESSAGES = [
   "claim-account",
   "claimed",
   "claim-rejected",
+  "list-ai-connections",
+  "ai-connections-list",
+  "revoke-ai-connection",
+  "ai-connection-revoked",
 ];
 
 interface ProtocolVersions {
@@ -156,18 +160,13 @@ test("a version's examples carry that protocol_version wherever a message has on
   }
 });
 
-test("v1 keeps a legacy hello and welcome (sent before the M2 fields existed) that stay valid", async () => {
-  const examples = await loadExamples(1);
-  for (const message of ["hello", "welcome"]) {
-    const legacy = examples.find((e) => e.message === message && e.file.includes(".legacy."));
-    assert.ok(legacy, `v1 must keep a legacy ${message} example`);
-    assert.equal((await validatorFor(message))(legacy.body), true);
-  }
-  const legacyHello = examples.find((e) => e.file === "hello.valid.legacy.json");
-  assert.ok(legacyHello && !("android_version" in legacyHello.body) && !("device_model" in legacyHello.body));
+test("device-registration: a request is just public_key — device_id is gone from the schema", async () => {
+  const validate = await validatorFor("device-registration");
+  assert.equal(validate({ public_key: "abc" }), true);
+  assert.equal(validate({ device_id: "x", public_key: "abc" }), false);
+  assert.equal(validate({ device_id: "x" }), false);
+  assert.equal(validate({ public_key: "abc", label: "phone" }), false);
 });
-
-// --- device ids are derived from the key (plan 03 milestone 3 follow-up) --------------------------
 
 test("examples/device-id-vectors.json: every vector's device_id is dt_ + hex SHA-256 of the key's DER bytes", async () => {
   const { createHash } = await import("node:crypto");
@@ -185,10 +184,30 @@ test("examples/device-id-vectors.json: every vector's device_id is dt_ + hex SHA
   assert.equal(ids.size, file.vectors.length, "vectors must be distinct");
 });
 
-test("device-registration: a request is just public_key; device_id is optional (deprecated), public_key required", async () => {
-  const validate = await validatorFor("device-registration");
-  assert.equal(validate({ public_key: "abc" }), true);
-  assert.equal(validate({ device_id: "x", public_key: "abc" }), true);
-  assert.equal(validate({ device_id: "x" }), false);
-  assert.equal(validate({ public_key: "abc", label: "phone" }), false);
+test("claim-account: install_hint is required; replace_device_id is optional", async () => {
+  const validate = await validatorFor("claim-account");
+  assert.equal(
+    validate({ type: "claim_account", account_token: "clt_x", install_hint: "abc" }),
+    true,
+  );
+  assert.equal(
+    validate({ type: "claim_account", account_token: "clt_x", install_hint: "abc", replace_device_id: "dt_x" }),
+    true,
+  );
+  assert.equal(validate({ type: "claim_account", account_token: "clt_x" }), false);
+  assert.equal(validate({ type: "claim_account", account_token: "clt_x", install_hint: "" }), false);
+});
+
+test("claim-rejected: device_limit_reached requires devices; other reasons forbid it", async () => {
+  const validate = await validatorFor("claim-rejected");
+  const devices = [
+    { device_id: "dt_" + "0".repeat(64), name: "Pixel 8", model: "Google Pixel 8", last_seen: "2026-10-21T09:30:00Z" },
+  ];
+  assert.equal(validate({ type: "claim_rejected", reason: "device_limit_reached", devices }), true);
+  assert.equal(validate({ type: "claim_rejected", reason: "device_limit_reached" }), false);
+  assert.equal(validate({ type: "claim_rejected", reason: "unknown_device" }), true);
+  assert.equal(validate({ type: "claim_rejected", reason: "unknown_device", devices }), false);
+  assert.equal(validate({ type: "claim_rejected", reason: "already_claimed" }), true);
+  assert.equal(validate({ type: "claim_rejected", reason: "invalid_token" }), true);
+  assert.equal(validate({ type: "claim_rejected", reason: "nope" }), false);
 });

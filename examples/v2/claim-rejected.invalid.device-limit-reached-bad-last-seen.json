@@ -1,0 +1,7 @@
+{
+  "type": "claim_rejected",
+  "reason": "device_limit_reached",
+  "devices": [
+    { "device_id": "dt_1111111111111111111111111111111111111111111111111111111111111111", "name": "Pixel 8", "model": "Google Pixel 8", "last_seen": "not-a-timestamp" }
+  ]
+}

@@ -5,7 +5,8 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { WebSocketServer } from "ws";
 import Ajv2020 from "ajv/dist/2020.js";
-import { FakeDevice, speakableVersions, loadProtocolVersions, defaultProtocolVersion } from "../src/index.js";
+import { FakeDevice, speakableVersions, loadProtocolVersions, defaultProtocolVersion, defaultCannedResponses } from "../src/index.js";
+import { SUBPROTOCOL } from "droidthumb-protocol";
 
 const require = createRequire(import.meta.url);
 
@@ -25,7 +26,7 @@ async function withStubServer<T>(fn: (url: string, hellos: Record<string, unknow
     }
     res.writeHead(404).end();
   });
-  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => "droidthumb.v1" });
+  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => SUBPROTOCOL });
   server.on("upgrade", (req, socket, head) => wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws)));
   wss.on("connection", (ws) => {
     ws.on("message", (raw) => {
@@ -34,7 +35,7 @@ async function withStubServer<T>(fn: (url: string, hellos: Record<string, unknow
         hellos.push(msg);
         ws.send(JSON.stringify({ type: "challenge", nonce: Buffer.from("nonce").toString("base64") }));
       } else if (msg["type"] === "challenge_response") {
-        ws.send(JSON.stringify({ type: "welcome", accepted: true, protocol_version: hellos[0]?.["protocol_version"] }));
+        ws.send(JSON.stringify({ type: "welcome", accepted: true, protocol_version: hellos[0]?.["protocol_version"], account_id: null }));
       }
     });
   });
@@ -71,19 +72,6 @@ for (const version of loadProtocolVersions().supported) {
       assert.equal(hello["device_model"], "Test Phone");
       const example = readProtocolJson(`droidthumb-protocol/examples/v${version}/hello.valid.json`);
       assert.deepEqual(Object.keys(hello).sort(), Object.keys(example).sort());
-    });
-  });
-
-  test(`v${version}: legacyHello omits android_version and device_model and still validates`, async () => {
-    await withStubServer(async (url, hellos) => {
-      const device = new FakeDevice({ url, protocolVersion: version, legacyHello: true });
-      await device.connect();
-      device.close();
-      const hello = hellos[0] as Record<string, unknown>;
-      assert.equal(validateHello(hello), true, JSON.stringify(validateHello.errors));
-      assert.ok(!("android_version" in hello) && !("device_model" in hello));
-      const legacy = readProtocolJson(`droidthumb-protocol/examples/v${version}/hello.valid.legacy.json`);
-      assert.deepEqual(Object.keys(hello).sort(), Object.keys(legacy).sort());
     });
   });
 }
@@ -135,13 +123,13 @@ test("registration returns the connector URL once; regenerateSecret() replaces i
     }
     res.writeHead(404).end();
   });
-  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => "droidthumb.v1" });
+  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => SUBPROTOCOL });
   server.on("upgrade", (req, socket, head) => wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws)));
   wss.on("connection", (ws) => {
     ws.on("message", (raw) => {
       const msg = JSON.parse(String(raw)) as Record<string, unknown>;
       if (msg["type"] === "hello") ws.send(JSON.stringify({ type: "challenge", nonce: "AAAA" }));
-      else if (msg["type"] === "challenge_response") ws.send(JSON.stringify({ type: "welcome", accepted: true, protocol_version: 1 }));
+      else if (msg["type"] === "challenge_response") ws.send(JSON.stringify({ type: "welcome", accepted: true, protocol_version: 2, account_id: null }));
       else if (msg["type"] === "regenerate_secret") {
         ws.send(JSON.stringify({ type: "secret_regenerated", connector_url: "https://example.test/d/dtk_second/mcp" }));
       }
@@ -177,13 +165,13 @@ test("claimAccount() resolves with account_id on `claimed`, rejects with the rea
     }
     res.writeHead(404).end();
   });
-  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => "droidthumb.v1" });
+  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => SUBPROTOCOL });
   server.on("upgrade", (req, socket, head) => wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws)));
   wss.on("connection", (ws) => {
     ws.on("message", (raw) => {
       const msg = JSON.parse(String(raw)) as Record<string, unknown>;
       if (msg["type"] === "hello") ws.send(JSON.stringify({ type: "challenge", nonce: "AAAA" }));
-      else if (msg["type"] === "challenge_response") ws.send(JSON.stringify({ type: "welcome", accepted: true, protocol_version: 1 }));
+      else if (msg["type"] === "challenge_response") ws.send(JSON.stringify({ type: "welcome", accepted: true, protocol_version: 2, account_id: null }));
       else if (msg["type"] === "claim_account") {
         const token = msg["account_token"] as string;
         if (token === "good-token") ws.send(JSON.stringify({ type: "claimed", account_id: "acc_test" }));
@@ -198,12 +186,12 @@ test("claimAccount() resolves with account_id on `claimed`, rejects with the rea
     const device = new FakeDevice({ url: `ws://127.0.0.1:${addr.port}/device` });
     await device.connect();
     assert.equal(device.claimedAccountId, null);
-    assert.equal(await device.claimAccount("good-token"), "acc_test");
+    assert.equal(await device.claimAccount("good-token", "hint-1"), "acc_test");
     assert.equal(device.claimedAccountId, "acc_test");
 
     const other = new FakeDevice({ url: `ws://127.0.0.1:${addr.port}/device` });
     await other.connect();
-    await assert.rejects(other.claimAccount("bad-token"), /invalid_token/);
+    await assert.rejects(other.claimAccount("bad-token", "hint-2"), /invalid_token/);
     assert.equal(other.claimedAccountId, null);
     other.close();
     device.close();
@@ -216,7 +204,166 @@ test("claimAccount() resolves with account_id on `claimed`, rejects with the rea
 
 test("claimAccount() rejects when not connected", async () => {
   const device = new FakeDevice({ url: "ws://127.0.0.1:1/device" });
-  await assert.rejects(device.claimAccount("x"), /not connected/);
+  await assert.rejects(device.claimAccount("x", "hint"), /not connected/);
+});
+
+test("claimAccount() sends install_hint always and replace_device_id when given; list/revoke AI connections round-trip", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const server = http.createServer((req, res) => {
+    if (req.method === "POST" && req.url === "/devices/register") {
+      res.writeHead(200, { "content-type": "application/json" }).end("{}");
+      return;
+    }
+    res.writeHead(404).end();
+  });
+  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => SUBPROTOCOL });
+  server.on("upgrade", (req, socket, head) => wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws)));
+  wss.on("connection", (ws) => {
+    ws.on("message", (raw) => {
+      const msg = JSON.parse(String(raw)) as Record<string, unknown>;
+      sent.push(msg);
+      if (msg["type"] === "hello") ws.send(JSON.stringify({ type: "challenge", nonce: "AAAA" }));
+      else if (msg["type"] === "challenge_response")
+        ws.send(JSON.stringify({ type: "welcome", accepted: true, protocol_version: 2, account_id: null }));
+      else if (msg["type"] === "claim_account") {
+        if (msg["replace_device_id"] === "dt_missing")
+          ws.send(JSON.stringify({ type: "claim_rejected", reason: "unknown_device" }));
+        else if (msg["replace_device_id"] === "dt_at_limit")
+          ws.send(
+            JSON.stringify({
+              type: "claim_rejected",
+              reason: "device_limit_reached",
+              devices: [{ device_id: "dt_x", name: "Old phone", model: "OnePlus Nord", last_seen: "2026-10-21T09:30:00Z" }],
+            }),
+          );
+        else ws.send(JSON.stringify({ type: "claimed", account_id: "acc_test" }));
+      } else if (msg["type"] === "list_ai_connections") {
+        if (msg["type"] === "list_ai_connections" && ws === null) return;
+        ws.send(
+          JSON.stringify({
+            type: "ai_connections_list",
+            ok: true,
+            connections: [
+              {
+                client_id: "cl_1",
+                client_name: "Claude",
+                display_name: "Claude",
+                image_url: null,
+                connected_at: "2026-09-30T12:00:00Z",
+                last_used_at: null,
+              },
+            ],
+          }),
+        );
+      } else if (msg["type"] === "revoke_ai_connection") {
+        if (msg["connection_id"] === "cl_1") ws.send(JSON.stringify({ type: "ai_connection_revoked", ok: true }));
+        else if (msg["connection_id"] === "cl_unclaimed")
+          ws.send(JSON.stringify({ type: "ai_connection_revoked", ok: false, error: { code: "not_claimed" } }));
+        else ws.send(JSON.stringify({ type: "ai_connection_revoked", ok: false, error: { code: "not_found" } }));
+      }
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  const addr = server.address();
+  if (typeof addr !== "object" || addr === null) throw new Error("expected AddressInfo");
+  try {
+    const device = new FakeDevice({ url: `ws://127.0.0.1:${addr.port}/device` });
+    await device.connect();
+
+    // claim_account: install_hint always present; replace_device_id only when asked.
+    await device.claimAccount("good-token", "hint-1");
+    const plainClaim = sent.find((m) => m["type"] === "claim_account" && m["install_hint"] === "hint-1");
+    assert.ok(plainClaim, "claim_account sent with install_hint");
+    assert.ok(!("replace_device_id" in (plainClaim as object)), "no replace_device_id unless asked");
+
+    // device_limit_rejected carries devices; unknown_device for a bad replace id.
+    await assert.rejects(device.claimAccount("t", "h", 5000, "dt_at_limit"), /device_limit_reached/);
+    await assert.rejects(device.claimAccount("t", "h", 5000, "dt_missing"), /unknown_device/);
+
+    // AI connections: list, revoke ok, not_found, not_claimed.
+    const connections = await device.listAiConnections();
+    assert.equal(connections.length, 1);
+    assert.equal(connections[0]?.client_id, "cl_1");
+    assert.equal(connections[0]?.last_used_at, null);
+    await device.revokeAiConnection("cl_1");
+    await assert.rejects(device.revokeAiConnection("cl_nope"), /not_found/);
+    await assert.rejects(device.revokeAiConnection("cl_unclaimed"), /not_claimed/);
+    device.close();
+  } finally {
+    wss.close();
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+test("a locked device answers device_locked for every step; type_text without a submit action answers submit_unsupported", async () => {
+  const server = http.createServer((req, res) => {
+    if (req.method === "POST" && req.url === "/devices/register") {
+      res.writeHead(200, { "content-type": "application/json" }).end("{}");
+      return;
+    }
+    res.writeHead(404).end();
+  });
+  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => SUBPROTOCOL });
+  server.on("upgrade", (req, socket, head) => wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws)));
+  const steps: { step_id: string; op: string }[] = [];
+  const responses: Record<string, unknown>[] = [];
+  let serverWs: import("ws").WebSocket | undefined;
+  wss.on("connection", (ws) => {
+    serverWs = ws;
+    ws.on("message", (raw) => {
+      const msg = JSON.parse(String(raw)) as Record<string, unknown>;
+      if (msg["type"] === "hello") ws.send(JSON.stringify({ type: "challenge", nonce: "AAAA" }));
+      else if (msg["type"] === "challenge_response")
+        ws.send(JSON.stringify({ type: "welcome", accepted: true, protocol_version: 2, account_id: null }));
+      else if (msg["type"] === "result" || msg["type"] === "error") responses.push(msg);
+    });
+  });
+  const sendStep = (id: string, op: string, params: Record<string, unknown>) =>
+    serverWs?.send(JSON.stringify({ type: "step", step_id: id, op, params }));
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  const addr = server.address();
+  if (typeof addr !== "object" || addr === null) throw new Error("expected AddressInfo");
+  try {
+    const lockedDevice = new FakeDevice({ url: `ws://127.0.0.1:${addr.port}/device`, locked: true });
+    await lockedDevice.connect();
+    if (!serverWs) throw new Error("no server websocket");
+    sendStep("s1", "read_screen", {});
+    sendStep("s2", "tap", { selector: { text: "x" } });
+    sendStep("s3", "launch_app", { package: "com.example" });
+    await new Promise((r) => setTimeout(r, 300));
+    const errors = responses.filter((r) => r["type"] === "error");
+    assert.equal(errors.length, 3, "every step errored while locked");
+    for (const e of errors) assert.equal(e["code"], "device_locked");
+    lockedDevice.close();
+
+    responses.length = 0;
+    const noSubmit = new FakeDevice({ url: `ws://127.0.0.1:${addr.port}/device`, typeTextSupportsSubmit: false });
+    await noSubmit.connect();
+    sendStep("s4", "type_text", { text: "hello", submit: true });
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(responses[0]?.["type"], "error");
+    assert.equal(responses[0]?.["code"], "submit_unsupported");
+    noSubmit.close();
+
+    responses.length = 0;
+    const device = new FakeDevice({ url: `ws://127.0.0.1:${addr.port}/device` });
+    await device.connect();
+    sendStep("s5", "type_text", { text: "hello", submit: true });
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(responses[0]?.["type"], "result");
+    device.close();
+  } finally {
+    wss.close();
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+test("read_screen's canned output carries locked: false when unlocked", async () => {
+  const canned = defaultCannedResponses();
+  const output = canned["read_screen"]?.({}) as { locked?: boolean };
+  assert.equal(output?.locked, false);
 });
 
 test("the device id is derived from the key: dt_ + hex SHA-256 of the SPKI DER, and registration sends only the key", async () => {

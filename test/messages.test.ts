@@ -34,8 +34,10 @@ test("hello: valid example passes", async () => {
     validate,
     {
       type: "hello",
-      protocol_version: 1,
+      protocol_version: 2,
       apk_version: "0.1.0",
+      android_version: 34,
+      device_model: "Google Pixel 8",
       device_id: "pixel-8-abc123",
       capabilities: ["a11y_tree"],
       mode: "live",
@@ -51,8 +53,10 @@ test("hello: missing required field fails", async () => {
     validate,
     {
       type: "hello",
-      protocol_version: 1,
+      protocol_version: 2,
       apk_version: "0.1.0",
+      android_version: 34,
+      device_model: "Google Pixel 8",
       device_id: "pixel-8-abc123",
       capabilities: ["a11y_tree"],
       // mode is missing
@@ -68,8 +72,10 @@ test("hello: wrong type discriminator fails", async () => {
     validate,
     {
       type: "welcome",
-      protocol_version: 1,
+      protocol_version: 2,
       apk_version: "0.1.0",
+      android_version: 34,
+      device_model: "Google Pixel 8",
       device_id: "pixel-8-abc123",
       capabilities: [],
       mode: "live",
@@ -88,7 +94,8 @@ test("welcome: valid example passes", async () => {
     {
       type: "welcome",
       accepted: true,
-      protocol_version: 1,
+      protocol_version: 2,
+      account_id: "acc_abc123",
       settings: { default_step_timeout_ms: 30000 },
     },
     "a well-formed welcome",
@@ -102,7 +109,8 @@ test("welcome: settings is optional", async () => {
     {
       type: "welcome",
       accepted: true,
-      protocol_version: 1,
+      protocol_version: 2,
+      account_id: null,
     },
     "a well-formed welcome with no settings",
   );
@@ -115,7 +123,8 @@ test("welcome: accepted: false fails (a soft-reject is not this shape yet)", asy
     {
       type: "welcome",
       accepted: false,
-      protocol_version: 1,
+      protocol_version: 2,
+      account_id: null,
     },
     "a welcome with accepted: false",
   );
@@ -153,7 +162,7 @@ test("device-registration: valid example passes", async () => {
   const validate = await loadValidator("device-registration.schema.json");
   assertValid(
     validate,
-    { device_id: "pixel-8-abc123", public_key: "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE...base64der..." },
+    { public_key: "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE...base64der..." },
     "a well-formed device-registration",
   );
 });
@@ -322,7 +331,7 @@ test("hello: android_version and device_model are accepted; a non-positive or em
   const validate = await loadValidator("hello.schema.json");
   const base = {
     type: "hello",
-    protocol_version: 1,
+    protocol_version: 2,
     apk_version: "1.0.0",
     device_id: "d",
     capabilities: [],
@@ -341,7 +350,7 @@ test("claim_account: valid example passes", async () => {
   const validate = await loadValidator("claim-account.schema.json");
   assertValid(
     validate,
-    { type: "claim_account", account_token: "clt_abc123" },
+    { type: "claim_account", account_token: "clt_abc123", install_hint: "3fa2f1c9d4e5b6a7" },
     "a well-formed claim_account",
   );
 });
@@ -349,6 +358,11 @@ test("claim_account: valid example passes", async () => {
 test("claim_account: missing account_token fails", async () => {
   const validate = await loadValidator("claim-account.schema.json");
   assertInvalid(validate, { type: "claim_account" }, "a claim_account missing account_token");
+  assertInvalid(
+    validate,
+    { type: "claim_account", account_token: "clt_abc123" },
+    "a claim_account missing install_hint",
+  );
 });
 
 test("claimed: valid example passes", async () => {
@@ -377,7 +391,7 @@ test("claim_rejected: unknown reason fails", async () => {
 
 test("welcome: the update fields are optional, and download_url must be https", async () => {
   const validate = await loadValidator("welcome.schema.json");
-  const base = { type: "welcome", accepted: true, protocol_version: 1 };
+  const base = { type: "welcome", accepted: true, protocol_version: 2, account_id: null };
   assertValid(validate, base, "welcome without update fields");
   assertValid(
     validate,

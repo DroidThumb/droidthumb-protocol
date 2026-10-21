@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schema.droidthumb.com/result.json",
   "title": "Result",
-  "description": "device -> server, success reply to a step.",
+  "description": "device -> server, success reply to a step. output is free-form per op; for `read_screen` it carries `tree` (the accessibility tree) and `locked` (required boolean, true when the phone is locked — a locked screen yields no usable tree, so the server can ask the user to unlock).",
   "type": "object",
   "additionalProperties": false,
   "required": ["type", "step_id"],

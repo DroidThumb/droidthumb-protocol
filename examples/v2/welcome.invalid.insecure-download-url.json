@@ -1,6 +1,6 @@
 {
   "type": "welcome",
   "accepted": true,
-  "protocol_version": 1,
+  "protocol_version": 2,
   "download_url": "http://example.com/app.apk"
 }
