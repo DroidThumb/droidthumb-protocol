@@ -1,6 +1,7 @@
 import { WebSocket } from "ws";
 import { generateKeyPairSync, createHash, sign as cryptoSign, type KeyObject } from "node:crypto";
 import type { Welcome, Step, Result, Error as ErrorMessage } from "droidthumb-protocol";
+import { SUBPROTOCOL } from "droidthumb-protocol";
 import { buildHello, defaultProtocolVersion } from "./dialects.js";
 import { defaultCannedResponses, type CannedResponses } from "./canned.js";
 import type { Override } from "./scenarios.js";
@@ -38,7 +39,7 @@ export interface FakeDeviceOptions {
   protocolVersion?: number;
   /** Send a message other than `hello` first, or omit fields — for negative handshake tests. */
   helloOverride?: Record<string, unknown>;
-  /** Skip offering the `droidthumb.v1` subprotocol — for negative handshake tests. */
+  /** Skip offering the subprotocol (SUBPROTOCOL) — for negative handshake tests. */
   omitSubprotocol?: boolean;
   /**
    * Skip the HTTP device-registration call before connecting (device-registration.schema.json) —
@@ -266,7 +267,7 @@ export class FakeDevice {
       await this.register();
     }
     return new Promise((resolve, reject) => {
-      const protocols = this.options.omitSubprotocol ? undefined : ["droidthumb.v1"];
+      const protocols = this.options.omitSubprotocol ? undefined : [SUBPROTOCOL];
       const ws = new WebSocket(this.options.url, protocols);
       this.ws = ws;
 

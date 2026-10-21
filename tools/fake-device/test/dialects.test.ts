@@ -6,6 +6,7 @@ import { createRequire } from "node:module";
 import { WebSocketServer } from "ws";
 import Ajv2020 from "ajv/dist/2020.js";
 import { FakeDevice, speakableVersions, loadProtocolVersions, defaultProtocolVersion, defaultCannedResponses } from "../src/index.js";
+import { SUBPROTOCOL } from "droidthumb-protocol";
 
 const require = createRequire(import.meta.url);
 
@@ -25,7 +26,7 @@ async function withStubServer<T>(fn: (url: string, hellos: Record<string, unknow
     }
     res.writeHead(404).end();
   });
-  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => "droidthumb.v1" });
+  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => SUBPROTOCOL });
   server.on("upgrade", (req, socket, head) => wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws)));
   wss.on("connection", (ws) => {
     ws.on("message", (raw) => {
@@ -122,7 +123,7 @@ test("registration returns the connector URL once; regenerateSecret() replaces i
     }
     res.writeHead(404).end();
   });
-  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => "droidthumb.v1" });
+  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => SUBPROTOCOL });
   server.on("upgrade", (req, socket, head) => wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws)));
   wss.on("connection", (ws) => {
     ws.on("message", (raw) => {
@@ -164,7 +165,7 @@ test("claimAccount() resolves with account_id on `claimed`, rejects with the rea
     }
     res.writeHead(404).end();
   });
-  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => "droidthumb.v1" });
+  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => SUBPROTOCOL });
   server.on("upgrade", (req, socket, head) => wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws)));
   wss.on("connection", (ws) => {
     ws.on("message", (raw) => {
@@ -215,7 +216,7 @@ test("claimAccount() sends install_hint always and replace_device_id when given;
     }
     res.writeHead(404).end();
   });
-  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => "droidthumb.v1" });
+  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => SUBPROTOCOL });
   server.on("upgrade", (req, socket, head) => wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws)));
   wss.on("connection", (ws) => {
     ws.on("message", (raw) => {
@@ -303,7 +304,7 @@ test("a locked device answers device_locked for every step; type_text without a 
     }
     res.writeHead(404).end();
   });
-  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => "droidthumb.v1" });
+  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => SUBPROTOCOL });
   server.on("upgrade", (req, socket, head) => wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws)));
   const steps: { step_id: string; op: string }[] = [];
   const responses: Record<string, unknown>[] = [];

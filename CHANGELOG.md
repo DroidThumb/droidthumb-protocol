@@ -12,7 +12,8 @@ describes and uses protocol version 2, and all version 1 examples are gone.
 
 - **Account claiming and device replacement (`claim_account`/`claimed`/`claim_rejected`).**
   - `claim_account` (device → server) requires `install_hint` (Android's per-app device ID,
-    `Settings.Secure.ANDROID_ID`) and carries an optional `replace_device_id`. When given, this
+    ANDROID_ID; the server keeps only a keyed hash of it and uses it to recognise the same phone
+    after a reinstall) and carries an optional `replace_device_id`. When given, this
     phone claims the account in place of the device with that id; that device is retired and, if
     connected, closed with the new WebSocket close code 4004 (`replaced`, exported as
     `CLOSE_REPLACED` from `src/close-codes.ts`).
@@ -38,6 +39,7 @@ describes and uses protocol version 2, and all version 1 examples are gone.
   the keyboard's own action that `type_text`'s `submit` asks for), `device_locked` (the phone is
   locked, so the action can't run), `not_claimed` (no account has claimed this phone) and
   `not_found` (the connection isn't one of the claiming account's connections).
+- **The WebSocket subprotocol is now `droidthumb.v2`** (`SUBPROTOCOL`, exported from this package).
 - **Examples.** Every supported version's examples live in `examples/v2/` — one valid and one
   invalid example per message, covering every new and changed shape: claim reasons (including
   `device_limit_reached` and `unknown_device`), AI connection list and revoke (including

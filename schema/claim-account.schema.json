@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schema.droidthumb.com/claim-account.json",
   "title": "ClaimAccount",
-  "description": "device -> server, sent on an established (challenge-verified) connection to claim this device for a signed-in account (design doc D-33). The connection itself proves possession of the device's Keystore key, the same pattern regenerate_secret uses, so the message carries no device identifier of its own. account_token is a short-lived, single-use token the app's own backend-facing session mints right after Google sign-in completes (POST /v1/accounts/claim-token) — not the OAuth access token itself, so a leaked claim token can't be replayed for anything beyond the one claim it was minted for. install_hint is Android's per-app device ID, recorded alongside the claim for support diagnostics. replace_device_id, when present, claims this phone in place of the account's device with that id: that device is retired and, if it is connected, its connection is closed with WS close code 4004 (\"replaced\" — CLOSE_REPLACED, exported from this package).",
+  "description": "device -> server, sent on an established (challenge-verified) connection to claim this device for a signed-in account (design doc D-33). The connection itself proves possession of the device's Keystore key, the same pattern regenerate_secret uses, so the message carries no device identifier of its own. account_token is a short-lived, single-use token the app's own backend-facing session mints right after Google sign-in completes (POST /accounts/claim-token) — not the OAuth access token itself, so a leaked claim token can't be replayed for anything beyond the one claim it was minted for. install_hint is Android's per-app device ID (ANDROID_ID); the server keeps only a keyed hash of it and uses it to recognise the same phone after a reinstall. replace_device_id, when present, claims this phone in place of the account's device with that id: that device is retired and, if it is connected, its connection is closed with WS close code 4004 (\"replaced\" — CLOSE_REPLACED, exported from this package).",
   "type": "object",
   "additionalProperties": false,
   "required": ["type", "account_token", "install_hint"],
@@ -12,7 +12,7 @@
     "install_hint": {
       "type": "string",
       "minLength": 1,
-      "description": "Android's per-app device ID (Settings.Secure.ANDROID_ID)."
+      "description": "Android's per-app device ID (ANDROID_ID); the server keeps only a keyed hash of it and uses it to recognise the same phone after a reinstall."
     },
     "replace_device_id": {
       "type": "string",
