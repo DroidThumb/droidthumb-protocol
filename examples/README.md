@@ -1,10 +1,10 @@
 # Protocol examples
 
-One directory per **supported** `protocol_version` (`v1/`, `v2/`, …), plus `protocol-versions.json`
-naming which versions exist and which the server must accept:
+One directory per **supported** `protocol_version`, plus `protocol-versions.json` naming which
+versions exist and which the server must accept:
 
 ```json
-{ "current": 1, "supported": [1] }
+{ "current": 2, "supported": [2] }
 ```
 
 `droidthumb-server` reads `supported` as the set of `protocol_version`s it accepts, so this file is
@@ -22,6 +22,4 @@ least one valid and one invalid example of every message in `test/protocol-versi
   examples are what already-shipped apps actually send; a schema change that rejects one is a
   breaking change and needs a new `protocol_version` (and a CHANGELOG entry), not an edited example.
   Adding examples is always fine.
-- `hello.valid.legacy.json` / `welcome.valid.legacy.json` are the shapes sent before
-  `android_version`/`device_model` and the welcome update fields existed. They stay valid.
 - When a version is retired (removed from `supported`), delete its directory in the same change.

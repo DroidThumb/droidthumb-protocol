@@ -1,0 +1,1 @@
+{ "type": "ai_connections_list", "ok": false, "error": { "code": "not_claimed", "message": "this phone has no account" } }

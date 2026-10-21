@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.droidthumb.com/list-ai-connections.json",
+  "title": "ListAiConnections",
+  "description": "device -> server, sent on an established (challenge-verified) connection to list the AI connections of the account that has claimed this phone. The server answers with `ai_connections_list`; when no account has claimed the phone it answers with the same message type carrying ok: false and error code \"not_claimed\".",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type"],
+  "properties": {
+    "type": { "const": "list_ai_connections" }
+  }
+}

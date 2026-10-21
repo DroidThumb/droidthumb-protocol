@@ -4,137 +4,47 @@ Every change to the wire protocol or flow-step schema, in enough detail that `dr
 (M2) can implement against it without reading the diff. Not a general commit log — skip anything
 that doesn't change a schema, a generated type, or a tool this package ships.
 
-## Unreleased
+## 2.0.0
 
-- **New message triple for claiming a device into an account (design doc D-33, v1.1 — accounts
-  return).** Still `protocol_version` 1: all three are new, additive message types.
-  - **`claim_account`** (device → server): sent on an already-challenge-verified connection, the
-    same pattern `regenerate_secret` uses — the connection itself proves possession of the device's
-    Keystore key, so the message carries only `account_token` (a short-lived, single-use token the
-    app's own backend-facing session mints right after Google sign-in completes), never a device
-    identifier of its own.
-  - **`claimed`** (server → device): `{account_id}`, sent on a successful claim (new, or an
-    idempotent re-claim by the account that already owns the device).
-  - **`claim_rejected`** (server → device): `{reason: "already_claimed" | "invalid_token"}`, sent
-    when a different account already owns the device, or `account_token` is invalid/expired/
-    already used.
-  - New required examples in every supported version's directory
-    (`test/protocol-versions.test.ts`'s `REQUIRED_MESSAGES`); the fake device will need to speak
-    this triple before `droidthumb-server`'s own tests against it can exercise the claim flow.
-- **Device ids are derived from the device's public key, not chosen by the device (plan 03
-  milestone 3 follow-up).** `device_id` = `"dt_"` + the lowercase hex SHA-256 of the DER bytes of the
-  device's X.509 SubjectPublicKeyInfo public key (the bytes that base64-decode from `public_key`) —
-  64 hex characters after the prefix. Nobody can register, or take over, another phone's id without
-  its private key. Test vectors (three real P-256 keys and their ids):
-  `examples/device-id-vectors.json`; an app's derivation must reproduce them byte for byte.
-  - **`POST /devices/register`:** a device now sends only `{public_key}`. `device_id` in the request
-    is **optional and deprecated**: if present it must equal the derived id or the server answers
-    400. `public_key` must be a valid EC P-256 SPKI key (400 otherwise). The response's `device_id`
-    is the derived id, and it is what the device puts in `hello`. Making `device_id` optional is
-    additive, so `protocol_version` stays 1 and the existing v1 registration example stays valid
-    (schema-valid; the server rejects that example's made-up id, which is not derived). The 409 for
-    "same id, different key" can no longer occur and is gone from the response docs.
-  - **`hello.device_id`:** unchanged on the wire (still a plain string, so the pre-existing v1
-    examples stay valid); the server accepts only an id derived from a registered key. Ids
-    registered before this change (arbitrary strings) are refused on connect (close 4002): they
-    must re-register.
-  - **Fake device:** the id is derived from its generated key (`deviceId` is read-only); the old
-    `deviceId` option is gone. `helloDeviceId` overrides only what `hello` says, for negative tests.
-- **Per-phone secret connector URL (`droidthumb-server` plan 03 milestone 3, D-29).** Still
-  `protocol_version` 1: everything below is a new optional message or field, so the app already in
-  the field is unaffected by it.
-  - **`POST /devices/register` now has a documented response schema**,
-    `schema/device-registration-response.schema.json` (`DeviceRegistrationResponse`):
-    `{device_id, connector_url?}`. `connector_url` — the phone's secret MCP URL,
-    `https://mcp.droidthumb.com/d/<secret>/mcp`, secret included — is present **only when this call
-    created the device**, and is never returned again; the server keeps only a hash of the secret.
-    The app must store it. A repeat registration with the same key still returns 200 but without
-    `connector_url`; a device that has lost it recovers with `regenerate_secret` (below). New status
-    code: **429** when the registration rate limit (per source IP) is hit, with a `Retry-After`
-    header. `device-registration.schema.json` (the request) is unchanged.
-  - **New WebSocket message pair for regenerating the secret:** `schema/regenerate-secret.schema.json`
-    (device → server, `{type: "regenerate_secret"}`, no other fields) and
-    `schema/secret-regenerated.schema.json` (server → device, `{type: "secret_regenerated",
-    connector_url}`), sent on an established connection, i.e. after `welcome`. No extra
-    authentication field: the connection *is* the authentication — the device has just proved it
-    holds its Keystore key in the `challenge`/`challenge_response` exchange. The old URL stops
-    working the moment the server processes the request. Rate-limited per device; an over-limit
-    request is ignored (no reply), so a client should time out rather than wait forever.
-  - **Fake device:** `connectorUrl` (set from the registration response and from every
-    `regenerateSecret()`), `regenerateSecret()`.
-  - Examples for all three schemas added under `examples/v1/`.
+Protocol version 2 — the current and only supported protocol version
+(`{"current": 2, "supported": [2]}`). Version 1 is retired: every schema, message and example now
+describes and uses protocol version 2, and all version 1 examples are gone.
 
-- **Version reporting and update info (`droidthumb-server` plan 03 milestone 2, design doc v0.14).**
-  Still `protocol_version` 1 — every change below is additive and optional, so an app built before
-  it (which sends none of it) keeps working unchanged.
-  - **`hello` gains two optional fields:** `android_version` (integer ≥ 1, the Android API level —
-    `Build.VERSION.SDK_INT`) and `device_model` (string, 1–128 chars — `Build.MANUFACTURER` +
-    `Build.MODEL`, diagnostic only). The app's own version is the **existing** `apk_version`
-    (semver, `BuildConfig.VERSION_NAME`); no separate `app_version` field was added, since renaming
-    or duplicating the one the shipped app already sends would gain nothing. The server logs all of
-    these, plus `protocol_version`, per connection.
-  - **`welcome` gains three optional fields:** `latest_app_version`, `minimum_supported_app_version`
-    (both non-empty strings) and `download_url` (`https://` only). The app compares its own version
-    to the first two to decide between an update banner and a blocking screen (plan 03 milestone 4);
-    `download_url` is where it fetches `latest_app_version`. The server always sends all three once
-    configured; an app must tolerate their absence.
-  - **Per-version contract examples: `examples/v<N>/`.** One directory per supported
-    `protocol_version`, each holding a valid and an invalid example of every message
-    (`<message>.<valid|invalid>[.<label>].json`), plus `examples/protocol-versions.json`
-    (`{"current": 1, "supported": [1]}`) — the single source of truth for which versions
-    `droidthumb-server` accepts, published as `droidthumb-protocol/examples/*`.
-    `test/protocol-versions.test.ts` validates every example against the schemas and enforces the
-    N/N−1 policy (at most two consecutive supported versions, the newest being `current`).
-    `examples/v1/hello.valid.legacy.json` and `welcome.valid.legacy.json` pin the pre-M2 shapes as
-    still valid. See `examples/README.md` for the never-edit-a-supported-version's-examples rule.
-  - **Fake device speaks any supported version.** `tools/fake-device` gains per-version `hello`
-    dialects (`src/dialects.ts`), `androidVersion`/`deviceModel`/`legacyHello` options, `connect()` callable again after `close()` (a reconnect with the same identity), and a default
-    `protocolVersion` taken from `DROIDTHUMB_FAKE_PROTOCOL_VERSION` (else `current`) so a consumer's
-    whole test suite can be run once per supported version. Its own tests fail if a supported
-    version has no dialect, and check the `hello` it puts on the wire against the schema and the
-    version's example.
-
-- **`welcome`'s `claimed` field removed (D-29, `droidthumb-server` design doc v0.13).** Added days
-  earlier (below) to say whether a device had an owning account; v0.13 removes accounts from v1
-  entirely, so there's nothing left for a device to be claimed *by* — `claimed` is now meaningless
-  and its `required` entry is gone along with it. It returns, LATER, if/when accounts do (D-29).
-  `welcome`'s only required fields now are `type`, `accepted`, `protocol_version`, matching the
-  original M0 shape before device identity was added.
-- **Device identity handshake (D-27, `droidthumb-server` design doc v0.12): `hello` → `welcome` is now
-  `hello` → `challenge` → `challenge_response` → `welcome`.** Two new WS message schemas —
-  `schema/challenge.schema.json` (server → device, a base64 `nonce`) and
-  `schema/challenge-response.schema.json` (device → server, a base64 ASN.1 DER ECDSA signature over
-  the nonce's raw bytes, `SHA256withECDSA`, matching Android Keystore's default EC signing output) —
-  and one new plain-HTTP-POST schema, `schema/device-registration.schema.json` (device → server,
-  `{device_id, public_key}`, the base64 X.509 SPKI DER of an EC P-256 key), sent once before a
-  device's first WebSocket connection. `hello` itself is unchanged. `welcome` gains a new required
-  `claimed: boolean` field: `false` means the connection is accepted (the device can `hello`/report
-  results) but the server won't relay a `run`/`step` command to it until an authenticated account
-  claims the device — an unclaimed device is connected, not driveable. A device whose `device_id` was
-  never registered, or whose challenge signature doesn't verify, never gets a `welcome` at all — the
-  connection is closed with a WS close code, the same pattern `hello` rejection already used (see
-  `droidthumb-server`'s `ws-server.ts` for the actual close-code values).
-- **`schema/flow.schema.json`'s `meta` field is now typed** (`{fragile?: boolean,
-  fragile_reason?: string}` instead of an untyped `{}`). `fragile: true` means `save_flow` found at
-  least one step whose params ended up coordinate-only (`at`, no `selector`) — the device found
-  nothing identifiable under the tapped point when the session was recorded, so that step can't
-  self-heal on replay the way a selector-based `tap` now can. Part of M3's "selectors from
-  coordinates" fix — see `droidthumb-server`'s decisions-log.
-- **Reconciled `schema/notification-event.schema.json` against `droidthumb-android`'s actual
-  Event Channel output (M2).** The M1-era version below was invented without that code in front of
-  it — a flat `{package, device_id?, sender?, text?, posted_at?}` object. Having now read
-  `droidthumb-android`'s `services/channel/*` (`ChannelEvent`/`ChannelEventFactory`), the real wire
-  shape is `{type: "notification", timestamp, data: {...}}` — a generic envelope the app already
-  uses so other event kinds can be added later without a new top-level shape, wrapping a rich
-  per-notification payload (`eventType`, `notificationId`, `packageName`, `appName`, `title`,
-  `text`, `bigText`, `subText`, `timestamp` as epoch ms, `isOngoing`, `isClearable`, `category`,
-  `groupKey`, `actions[]`). The app's shape was judged not "genuinely wrong" — richer than the
-  server's trigger-matching currently needs, but a reasonable, already-built design, not a bug — so
-  the server's schema changes to match it rather than the other way round. `package`/`sender`/`text`
-  (the server's own trigger-matching vocabulary, unrelated to the wire shape) are unaffected: they
-  now read from `data.packageName`/`data.title`/`data.text` instead of top-level fields.
-  `device_id`/`posted_at` are dropped — the app never sent them. See `droidthumb-server`'s
-  decisions-log for the full reasoning.
+- **Account claiming and device replacement (`claim_account`/`claimed`/`claim_rejected`).**
+  - `claim_account` (device → server) requires `install_hint` (Android's per-app device ID,
+    ANDROID_ID; the server keeps only a keyed hash of it and uses it to recognise the same phone
+    after a reinstall) and carries an optional `replace_device_id`. When given, this
+    phone claims the account in place of the device with that id; that device is retired and, if
+    connected, closed with the new WebSocket close code 4004 (`replaced`, exported as
+    `CLOSE_REPLACED` from `src/close-codes.ts`).
+  - `claim_rejected` (server → device) reasons are now `already_claimed`, `invalid_token`,
+    `device_limit_reached` (with a required `devices` array listing the account's current devices:
+    `device_id`, `name`, `model`, `last_seen`) and `unknown_device` (when `replace_device_id`
+    doesn't name one of the account's phones).
+- **AI connection management (new message pair).**
+  - `list_ai_connections` (device → server) and `ai_connections_list` (server → device) list the
+    claiming account's AI connections (`client_id`, `client_name`, `display_name`, `image_url`,
+    `connected_at`, `last_used_at`).
+  - `revoke_ai_connection` (device → server) and `ai_connection_revoked` (server → device) revoke
+    one connection by `connection_id`.
+  - Error branches carry `not_claimed` (no account has claimed the phone) or `not_found`
+    (`connection_id` isn't one of the claiming account's connections).
+- **Step changes.**
+  - `type_text` params gain `append` (boolean, default false: the text replaces the field's
+    content) and `submit` (boolean, default false: after typing, send the keyboard's own action,
+    such as Search or Go). The previous `clear` option is gone.
+  - `read_screen` results gain a required boolean `locked` (true when the phone is locked — a
+    locked screen yields no usable tree, so the server can ask the user to unlock).
+- **Error codes.** `schema/error.schema.json` documents `submit_unsupported` (the phone can't send
+  the keyboard's own action that `type_text`'s `submit` asks for), `device_locked` (the phone is
+  locked, so the action can't run), `not_claimed` (no account has claimed this phone) and
+  `not_found` (the connection isn't one of the claiming account's connections).
+- **The WebSocket subprotocol is now `droidthumb.v2`** (`SUBPROTOCOL`, exported from this package).
+- **Examples.** Every supported version's examples live in `examples/v2/` — one valid and one
+  invalid example per message, covering every new and changed shape: claim reasons (including
+  `device_limit_reached` and `unknown_device`), AI connection list and revoke (including
+  `not_claimed` and `not_found`), `type_text` with `append`/`submit`, `read_screen` with `locked`,
+  and the new error codes.
 
 ## M5 — notification trigger endpoint (superseded above, kept for history)
 

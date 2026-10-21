@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schema.droidthumb.com/step.json",
   "title": "Step",
-  "description": "server -> device, one per MCP tool call. `op` is deliberately an open string for M0/M1: it is one of the small subset of step-vocabulary names M1 exposes on the MCP surface, not a raw Android handler name and not (yet) the full closed step vocabulary from the design doc.",
+  "description": "server -> device, one per MCP tool call. `op` is one of the step-vocabulary names the server exposes on the MCP surface, not a raw Android handler name. params are free-form per op; for `type_text` they carry: `text` (the text to type), `selector` (the field to type into), `append` (boolean, default false: the text replaces the field's content) and `submit` (boolean, default false: after typing, send the keyboard's own action, such as Search or Go — the preferred way to send a search or form).",
   "type": "object",
   "additionalProperties": false,
   "required": ["type", "step_id", "op"],

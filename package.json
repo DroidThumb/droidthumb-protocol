@@ -1,6 +1,6 @@
 {
   "name": "droidthumb-protocol",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "DroidThumb wire protocol and flow-step schema: JSON Schema + generated TypeScript types.",
   "license": "MIT",
   "private": false,

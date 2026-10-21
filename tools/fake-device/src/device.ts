@@ -1,6 +1,7 @@
 import { WebSocket } from "ws";
 import { generateKeyPairSync, createHash, sign as cryptoSign, type KeyObject } from "node:crypto";
 import type { Welcome, Step, Result, Error as ErrorMessage } from "droidthumb-protocol";
+import { SUBPROTOCOL } from "droidthumb-protocol";
 import { buildHello, defaultProtocolVersion } from "./dialects.js";
 import { defaultCannedResponses, type CannedResponses } from "./canned.js";
 import type { Override } from "./scenarios.js";
@@ -13,20 +14,24 @@ export interface FakeDeviceOptions {
    * accepts. The registration request never carries an id.
    */
   helloDeviceId?: string;
-  /** Also send the (deprecated) device_id in the registration request — for negative tests. */
-  registrationDeviceId?: string;
   apkVersion?: string;
   /** Android API level reported in `hello`. Default 34. */
   androidVersion?: number;
   /** Hardware model reported in `hello`. Default "Fake Device". */
   deviceModel?: string;
-  /**
-   * Speak `hello` the way an app built before android_version/device_model existed did (omit
-   * them). Such apps are still in the field, so the server must keep accepting them.
-   */
-  legacyHello?: boolean;
   mode?: "live" | "unattended";
   capabilities?: string[];
+  /**
+   * Simulate a locked phone: every step's canned result becomes a `device_locked` error and
+   * `read_screen`'s output would carry `locked: true`. Default false.
+   */
+  locked?: boolean;
+  /**
+   * Whether the fixture keyboard has a send/search action for `type_text`'s `submit`. Default
+   * true; set false to simulate a field whose keyboard can't submit (the device answers
+   * `submit_unsupported`).
+   */
+  typeTextSupportsSubmit?: boolean;
   /**
    * The protocol_version to speak. Defaults to `DROIDTHUMB_FAKE_PROTOCOL_VERSION` if set, else the
    * protocol's current version (`examples/protocol-versions.json`).
@@ -34,7 +39,7 @@ export interface FakeDeviceOptions {
   protocolVersion?: number;
   /** Send a message other than `hello` first, or omit fields — for negative handshake tests. */
   helloOverride?: Record<string, unknown>;
-  /** Skip offering the `droidthumb.v1` subprotocol — for negative handshake tests. */
+  /** Skip offering the subprotocol (SUBPROTOCOL) — for negative handshake tests. */
   omitSubprotocol?: boolean;
   /**
    * Skip the HTTP device-registration call before connecting (device-registration.schema.json) —
@@ -80,10 +85,21 @@ export class FakeDevice {
   private pendingRegenerate: { resolve: (url: string) => void; reject: (err: Error) => void; timer: NodeJS.Timeout } | null = null;
   private claimedAccountIdValue: string | null = null;
   private pendingClaim: { resolve: (accountId: string) => void; reject: (err: Error) => void; timer: NodeJS.Timeout } | null = null;
+  private pendingList:
+    | {
+        resolve: (connections: { client_id: string; client_name: string; display_name: string; image_url: string | null; connected_at: string; last_used_at: string | null }[]) => void;
+        reject: (err: Error) => void;
+        timer: NodeJS.Timeout;
+      }
+    | null = null;
+  private pendingRevoke: { resolve: () => void; reject: (err: Error) => void; timer: NodeJS.Timeout } | null = null;
   private closedInfo: CloseInfo | null = null;
 
   constructor(private readonly options: FakeDeviceOptions) {
-    this.canned = defaultCannedResponses();
+    this.canned = defaultCannedResponses({
+      locked: options.locked,
+      typeTextSupportsSubmit: options.typeTextSupportsSubmit,
+    });
     const { publicKey, privateKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
     this.privateKey = privateKey;
     const der = publicKey.export({ type: "spki", format: "der" });
@@ -134,10 +150,11 @@ export class FakeDevice {
 
   /**
    * Sends `claim_account` over the authenticated connection (design doc D-33) and resolves with the
-   * `account_id` from `claimed`. Rejects with the rejection reason on `claim_rejected`, or on no
-   * reply within `timeoutMs`.
+   * `account_id` from `claimed`. `installHint` is required (protocol v2). `replaceDeviceId`, when
+   * given, claims this phone in place of that device. Rejects with the rejection reason on
+   * `claim_rejected`, or on no reply within `timeoutMs`.
    */
-  claimAccount(accountToken: string, timeoutMs = 5000): Promise<string> {
+  claimAccount(accountToken: string, installHint: string, timeoutMs = 5000, replaceDeviceId?: string): Promise<string> {
     const ws = this.ws;
     if (!this.welcomed || !ws) return Promise.reject(new Error("not connected"));
     return new Promise<string>((resolve, reject) => {
@@ -146,7 +163,56 @@ export class FakeDevice {
         reject(new Error("no claimed/claim_rejected reply within timeout"));
       }, timeoutMs);
       this.pendingClaim = { resolve, reject, timer };
-      ws.send(JSON.stringify({ type: "claim_account", account_token: accountToken }));
+      ws.send(
+        JSON.stringify({
+          type: "claim_account",
+          account_token: accountToken,
+          install_hint: installHint,
+          ...(replaceDeviceId !== undefined ? { replace_device_id: replaceDeviceId } : {}),
+        }),
+      );
+    });
+  }
+
+  /**
+   * Sends `list_ai_connections` over the authenticated connection and resolves with the
+   * `ai_connections_list` reply (its `connections` on ok). Rejects with the error code on the
+   * error branch (`not_claimed`), or on no reply within `timeoutMs`.
+   */
+  listAiConnections(
+    timeoutMs = 5000,
+  ): Promise<
+    { client_id: string; client_name: string; display_name: string; image_url: string | null; connected_at: string; last_used_at: string | null }[]
+  > {
+    const ws = this.ws;
+    if (!this.welcomed || !ws) return Promise.reject(new Error("not connected"));
+    return new Promise<
+      { client_id: string; client_name: string; display_name: string; image_url: string | null; connected_at: string; last_used_at: string | null }[]
+    >((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingList = null;
+        reject(new Error("no ai_connections_list reply within timeout"));
+      }, timeoutMs);
+      this.pendingList = { resolve, reject, timer };
+      ws.send(JSON.stringify({ type: "list_ai_connections" }));
+    });
+  }
+
+  /**
+   * Sends `revoke_ai_connection` over the authenticated connection and resolves once the server
+   * answers `ai_connection_revoked`. Rejects with the error code on the error branch
+   * (`not_claimed`, `not_found`), or on no reply within `timeoutMs`.
+   */
+  revokeAiConnection(connectionId: string, timeoutMs = 5000): Promise<void> {
+    const ws = this.ws;
+    if (!this.welcomed || !ws) return Promise.reject(new Error("not connected"));
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingRevoke = null;
+        reject(new Error("no ai_connection_revoked reply within timeout"));
+      }, timeoutMs);
+      this.pendingRevoke = { resolve, reject, timer };
+      ws.send(JSON.stringify({ type: "revoke_ai_connection", connection_id: connectionId }));
     });
   }
 
@@ -167,10 +233,7 @@ export class FakeDevice {
     const res = await fetch(registerUrl, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        ...(this.options.registrationDeviceId !== undefined ? { device_id: this.options.registrationDeviceId } : {}),
-        public_key: this.publicKeyBase64,
-      }),
+      body: JSON.stringify({ public_key: this.publicKeyBase64 }),
     });
     if (!res.ok) {
       throw new Error(`device registration failed: ${res.status} ${await res.text()}`);
@@ -204,7 +267,7 @@ export class FakeDevice {
       await this.register();
     }
     return new Promise((resolve, reject) => {
-      const protocols = this.options.omitSubprotocol ? undefined : ["droidthumb.v1"];
+      const protocols = this.options.omitSubprotocol ? undefined : [SUBPROTOCOL];
       const ws = new WebSocket(this.options.url, protocols);
       this.ws = ws;
 
@@ -216,7 +279,6 @@ export class FakeDevice {
           deviceModel: this.options.deviceModel ?? "Fake Device",
           capabilities: this.options.capabilities ?? [],
           mode: this.options.mode ?? "live",
-          legacy: this.options.legacyHello ?? false,
         });
         const payload = this.options.helloOverride ?? hello;
         ws.send(JSON.stringify(payload));
@@ -268,6 +330,26 @@ export class FakeDevice {
           this.pendingClaim = null;
           clearTimeout(pending.timer);
           pending.reject(new Error(`claim_rejected: ${msg.reason as string}`));
+        } else if (msg.type === "ai_connections_list" && this.pendingList) {
+          const pending = this.pendingList;
+          this.pendingList = null;
+          clearTimeout(pending.timer);
+          if (msg.ok === true) {
+            pending.resolve(msg.connections as { client_id: string; client_name: string; display_name: string; image_url: string | null; connected_at: string; last_used_at: string | null }[]);
+          } else {
+            const err = msg.error as { code?: string } | undefined;
+            pending.reject(new Error(`ai_connections_list error: ${err?.code ?? "unknown"}`));
+          }
+        } else if (msg.type === "ai_connection_revoked" && this.pendingRevoke) {
+          const pending = this.pendingRevoke;
+          this.pendingRevoke = null;
+          clearTimeout(pending.timer);
+          if (msg.ok === true) {
+            pending.resolve();
+          } else {
+            const err = msg.error as { code?: string } | undefined;
+            pending.reject(new Error(`ai_connection_revoked error: ${err?.code ?? "unknown"}`));
+          }
         }
       });
     });
@@ -303,6 +385,13 @@ export class FakeDevice {
         return;
       case "result": {
         const output = behaviour.output !== undefined ? behaviour.output : this.canned[step.op]?.(step.params);
+        // A canned responder can answer with an error (device_locked, submit_unsupported) instead
+        // of a result: shape { error: { code, message } }.
+        const err = (output as { error?: { code?: string; message?: string } } | undefined)?.error;
+        if (err && typeof err.code === "string") {
+          this.send({ type: "error", step_id: step.step_id, code: err.code, message: err.message ?? err.code });
+          return;
+        }
         this.send({ type: "result", step_id: step.step_id, output });
         return;
       }
