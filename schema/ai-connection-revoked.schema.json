@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.droidthumb.com/ai-connection-revoked.json",
+  "title": "AiConnectionRevoked",
+  "description": "server -> device, the reply to revoke_ai_connection. ok: true means the connection was revoked. ok: false carries an error: \"not_claimed\" when no account has claimed this phone, \"not_found\" when connection_id isn't one of the claiming account's connections.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ok"],
+      "properties": {
+        "type": { "const": "ai_connection_revoked" },
+        "ok": { "const": true }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ok", "error"],
+      "properties": {
+        "type": { "const": "ai_connection_revoked" },
+        "ok": { "const": false },
+        "error": { "$ref": "#/$defs/error" }
+      }
+    }
+  ],
+  "$defs": {
+    "error": {
+      "type": "object",
+      "title": "AiConnectionRevokedError",
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": {
+        "code": { "enum": ["not_claimed", "not_found"] },
+        "message": { "type": "string" }
+      }
+    }
+  }
+}

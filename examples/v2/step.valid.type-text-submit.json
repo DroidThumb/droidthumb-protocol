@@ -1,0 +1,1 @@
+{ "type": "step", "step_id": "s-2", "op": "type_text", "params": { "selector": { "resource_id": "com.example:id/search" }, "text": "hello", "append": false, "submit": true } }

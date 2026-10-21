@@ -22,8 +22,6 @@ export interface HelloFields {
   deviceModel: string;
   capabilities: string[];
   mode: "live" | "unattended";
-  /** Simulate an app built before android_version/device_model existed. */
-  legacy: boolean;
 }
 
 /**
@@ -33,11 +31,12 @@ export interface HelloFields {
  * fake device to speak it is caught in this repo's own CI, not later in droidthumb-server's.
  */
 const helloBuilders: Record<number, (version: number, f: HelloFields) => Hello> = {
-  1: (version, f) => ({
+  2: (version, f) => ({
     type: "hello",
     protocol_version: version,
     apk_version: f.apkVersion,
-    ...(f.legacy ? {} : { android_version: f.androidVersion, device_model: f.deviceModel }),
+    android_version: f.androidVersion,
+    device_model: f.deviceModel,
     device_id: f.deviceId,
     capabilities: f.capabilities,
     mode: f.mode,

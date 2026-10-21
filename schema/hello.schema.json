@@ -2,10 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schema.droidthumb.com/hello.json",
   "title": "Hello",
-  "description": "device -> server, sent once per connection to open the handshake. `apk_version` is the app's own version (semver) — the 'app version' the server logs per connection. `android_version` and `device_model` are optional so an app built before they existed still validates; the server records them for compatibility decisions.",
+  "description": "device -> server, sent once per connection to open the handshake. `apk_version` is the app's own version (semver) — the 'app version' the server logs per connection. `android_version` is the Android API level and `device_model` the hardware model; the server records both for diagnostics.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["type", "protocol_version", "apk_version", "device_id", "capabilities", "mode", "flow_manifest"],
+  "required": ["type", "protocol_version", "apk_version", "android_version", "device_model", "device_id", "capabilities", "mode", "flow_manifest"],
   "properties": {
     "type": { "const": "hello" },
     "protocol_version": { "type": "integer", "minimum": 1 },
