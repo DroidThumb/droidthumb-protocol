@@ -6,9 +6,6 @@ import { buildHello, defaultProtocolVersion } from "./dialects.js";
 import { defaultCannedResponses, type CannedResponses } from "./canned.js";
 import type { Override } from "./scenarios.js";
 
-/** The `output` shape `Result` carries (a generated type; repeated here as a narrow alias). */
-type ResultOutput = NonNullable<Result["output"]>;
-
 export interface FakeDeviceOptions {
   url: string;
   /**
@@ -387,25 +384,16 @@ export class FakeDevice {
         this.send({ type: "error", step_id: step.step_id, code: behaviour.code, message: behaviour.message });
         return;
       case "result": {
-        const raw = behaviour.output !== undefined ? behaviour.output : this.canned[step.op]?.(step.params);
+        const output = behaviour.output !== undefined ? behaviour.output : this.canned[step.op]?.(step.params);
         // A canned responder can answer with an error (device_locked, submit_unsupported) instead
         // of a result: shape { error: { code, message } }.
         const err =
-          typeof raw === "object" && raw !== null && "error" in raw
-            ? (raw as { error: { code?: string; message?: string } }).error
+          typeof output === "object" && output !== null && "error" in output
+            ? (output as { error: { code?: string; message?: string } }).error
             : undefined;
         if (err && typeof err.code === "string") {
           this.send({ type: "error", step_id: step.step_id, code: err.code, message: err.message ?? err.code });
           return;
-        }
-        // Anything else the responder produced must satisfy Result's output shape: a plain value
-        // (string, number, boolean) is wrapped, an object passes as-is, null/undefined send no
-        // output at all.
-        let output: ResultOutput | undefined;
-        if (typeof raw === "object" && raw !== null) {
-          output = raw as ResultOutput;
-        } else if (raw !== undefined) {
-          output = { value: raw };
         }
         this.send({ type: "result", step_id: step.step_id, output });
         return;
