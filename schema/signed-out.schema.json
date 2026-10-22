@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.droidthumb.com/signed-out.json",
+  "title": "SignedOut",
+  "description": "server -> device, the reply to sign_out. Also sent when the phone was already signed out, and by a server without accounts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type"],
+  "properties": {
+    "type": { "const": "signed_out" }
+  }
+}

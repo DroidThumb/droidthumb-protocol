@@ -24,9 +24,11 @@ const REQUIRED_MESSAGES = [
   "device-registration-response",
   "regenerate-secret",
   "secret-regenerated",
-  "claim-account",
-  "claimed",
-  "claim-rejected",
+  "sign-in",
+  "signed-in",
+  "sign-in-rejected",
+  "sign-out",
+  "signed-out",
   "list-ai-connections",
   "ai-connections-list",
   "revoke-ai-connection",
@@ -184,30 +186,40 @@ test("examples/device-id-vectors.json: every vector's device_id is dt_ + hex SHA
   assert.equal(ids.size, file.vectors.length, "vectors must be distinct");
 });
 
-test("claim-account: install_hint is required; replace_device_id is optional", async () => {
-  const validate = await validatorFor("claim-account");
+test("sign-in: install_hint is required; replace_device_id is optional", async () => {
+  const validate = await validatorFor("sign-in");
   assert.equal(
-    validate({ type: "claim_account", account_token: "clt_x", install_hint: "abc" }),
+    validate({ type: "sign_in", account_token: "clt_x", install_hint: "abc" }),
     true,
   );
   assert.equal(
-    validate({ type: "claim_account", account_token: "clt_x", install_hint: "abc", replace_device_id: "dt_x" }),
+    validate({ type: "sign_in", account_token: "clt_x", install_hint: "abc", replace_device_id: "dt_x" }),
     true,
   );
-  assert.equal(validate({ type: "claim_account", account_token: "clt_x" }), false);
-  assert.equal(validate({ type: "claim_account", account_token: "clt_x", install_hint: "" }), false);
+  assert.equal(validate({ type: "sign_in", account_token: "clt_x" }), false);
+  assert.equal(validate({ type: "sign_in", account_token: "clt_x", install_hint: "" }), false);
 });
 
-test("claim-rejected: device_limit_reached requires devices; other reasons forbid it", async () => {
-  const validate = await validatorFor("claim-rejected");
+test("sign-in-rejected: device_limit_reached requires devices; other reasons forbid it", async () => {
+  const validate = await validatorFor("sign-in-rejected");
   const devices = [
     { device_id: "dt_" + "0".repeat(64), name: "Pixel 8", model: "Google Pixel 8", last_seen: "2026-10-21T09:30:00Z" },
   ];
-  assert.equal(validate({ type: "claim_rejected", reason: "device_limit_reached", devices }), true);
-  assert.equal(validate({ type: "claim_rejected", reason: "device_limit_reached" }), false);
-  assert.equal(validate({ type: "claim_rejected", reason: "unknown_device" }), true);
-  assert.equal(validate({ type: "claim_rejected", reason: "unknown_device", devices }), false);
-  assert.equal(validate({ type: "claim_rejected", reason: "already_claimed" }), true);
-  assert.equal(validate({ type: "claim_rejected", reason: "invalid_token" }), true);
-  assert.equal(validate({ type: "claim_rejected", reason: "nope" }), false);
+  assert.equal(validate({ type: "sign_in_rejected", reason: "device_limit_reached", devices }), true);
+  assert.equal(validate({ type: "sign_in_rejected", reason: "device_limit_reached" }), false);
+  assert.equal(validate({ type: "sign_in_rejected", reason: "unknown_device" }), true);
+  assert.equal(validate({ type: "sign_in_rejected", reason: "unknown_device", devices }), false);
+  assert.equal(validate({ type: "sign_in_rejected", reason: "invalid_token" }), true);
+  assert.equal(validate({ type: "sign_in_rejected", reason: "accounts_unsupported" }), true);
+  assert.equal(validate({ type: "sign_in_rejected", reason: "accounts_unsupported", devices }), false);
+  assert.equal(validate({ type: "sign_in_rejected", reason: "nope" }), false);
+});
+
+test("sign-out and signed_out carry only the type discriminator", async () => {
+  const signOut = await validatorFor("sign-out");
+  assert.equal(signOut({ type: "sign_out" }), true);
+  assert.equal(signOut({ type: "sign_out", account_id: "acc_x" }), false);
+  const signedOut = await validatorFor("signed-out");
+  assert.equal(signedOut({ type: "signed_out" }), true);
+  assert.equal(signedOut({ type: "signed_out", account_id: "acc_x" }), false);
 });
