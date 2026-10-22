@@ -95,6 +95,7 @@ test("welcome: valid example passes", async () => {
       type: "welcome",
       accepted: true,
       protocol_version: 2,
+      accounts: true,
       account_id: "acc_abc123",
       settings: { default_step_timeout_ms: 30000 },
     },
@@ -110,6 +111,7 @@ test("welcome: settings is optional", async () => {
       type: "welcome",
       accepted: true,
       protocol_version: 2,
+      accounts: false,
       account_id: null,
     },
     "a well-formed welcome with no settings",
@@ -124,10 +126,20 @@ test("welcome: accepted: false fails (a soft-reject is not this shape yet)", asy
       type: "welcome",
       accepted: false,
       protocol_version: 2,
+      accounts: true,
       account_id: null,
     },
     "a welcome with accepted: false",
   );
+});
+
+test("welcome: accounts is a required boolean, true or false", async () => {
+  const validate = await loadValidator("welcome.schema.json");
+  const base = { type: "welcome", accepted: true, protocol_version: 2, account_id: null };
+  assertValid(validate, { ...base, accounts: true }, "a welcome from a server with accounts");
+  assertValid(validate, { ...base, accounts: false }, "a welcome from a server without accounts");
+  assertInvalid(validate, base, "a welcome missing accounts");
+  assertInvalid(validate, { ...base, accounts: "true" }, "a welcome with a non-boolean accounts");
 });
 
 // --- challenge / challenge_response ---------------------------------------
@@ -344,54 +356,83 @@ test("hello: android_version and device_model are accepted; a non-positive or em
   assertInvalid(validate, { ...base, device_model: "x".repeat(129) }, "over-long device_model");
 });
 
-// --- claim_account / claimed / claim_rejected (design doc D-33) ---------------------------
+// --- sign_in / signed_in / sign_in_rejected (design doc D-33) ---------------------------
 
-test("claim_account: valid example passes", async () => {
-  const validate = await loadValidator("claim-account.schema.json");
+test("sign_in: valid example passes", async () => {
+  const validate = await loadValidator("sign-in.schema.json");
   assertValid(
     validate,
-    { type: "claim_account", account_token: "clt_abc123", install_hint: "3fa2f1c9d4e5b6a7" },
-    "a well-formed claim_account",
+    { type: "sign_in", account_token: "clt_abc123", install_hint: "3fa2f1c9d4e5b6a7" },
+    "a well-formed sign_in",
   );
 });
 
-test("claim_account: missing account_token fails", async () => {
-  const validate = await loadValidator("claim-account.schema.json");
-  assertInvalid(validate, { type: "claim_account" }, "a claim_account missing account_token");
+test("sign_in: missing account_token or install_hint fails", async () => {
+  const validate = await loadValidator("sign-in.schema.json");
+  assertInvalid(validate, { type: "sign_in" }, "a sign_in missing account_token");
   assertInvalid(
     validate,
-    { type: "claim_account", account_token: "clt_abc123" },
-    "a claim_account missing install_hint",
+    { type: "sign_in", account_token: "clt_abc123" },
+    "a sign_in missing install_hint",
   );
 });
 
-test("claimed: valid example passes", async () => {
-  const validate = await loadValidator("claimed.schema.json");
-  assertValid(validate, { type: "claimed", account_id: "acc_abc123" }, "a well-formed claimed");
+test("signed_in: valid example passes", async () => {
+  const validate = await loadValidator("signed-in.schema.json");
+  assertValid(validate, { type: "signed_in", account_id: "acc_abc123" }, "a well-formed signed_in");
 });
 
-test("claimed: missing account_id fails", async () => {
-  const validate = await loadValidator("claimed.schema.json");
-  assertInvalid(validate, { type: "claimed" }, "a claimed missing account_id");
+test("signed_in: missing account_id fails", async () => {
+  const validate = await loadValidator("signed-in.schema.json");
+  assertInvalid(validate, { type: "signed_in" }, "a signed_in missing account_id");
 });
 
-test("claim_rejected: valid example passes", async () => {
-  const validate = await loadValidator("claim-rejected.schema.json");
+test("sign_in_rejected: valid example passes", async () => {
+  const validate = await loadValidator("sign-in-rejected.schema.json");
   assertValid(
     validate,
-    { type: "claim_rejected", reason: "already_claimed" },
-    "a well-formed claim_rejected",
+    { type: "sign_in_rejected", reason: "invalid_token" },
+    "a well-formed sign_in_rejected",
+  );
+  assertValid(
+    validate,
+    { type: "sign_in_rejected", reason: "accounts_unsupported" },
+    "a sign_in_rejected from a server without accounts",
   );
 });
 
-test("claim_rejected: unknown reason fails", async () => {
-  const validate = await loadValidator("claim-rejected.schema.json");
-  assertInvalid(validate, { type: "claim_rejected", reason: "nope" }, "a claim_rejected with an unknown reason");
+test("sign_in_rejected: unknown reason fails", async () => {
+  const validate = await loadValidator("sign-in-rejected.schema.json");
+  assertInvalid(validate, { type: "sign_in_rejected", reason: "nope" }, "a sign_in_rejected with an unknown reason");
+});
+
+// --- sign_out / signed_out -------------------------------------------------------------
+
+test("sign_out: valid example passes", async () => {
+  const validate = await loadValidator("sign-out.schema.json");
+  assertValid(validate, { type: "sign_out" }, "a well-formed sign_out");
+});
+
+test("sign_out: only the type discriminator is allowed", async () => {
+  const validate = await loadValidator("sign-out.schema.json");
+  assertInvalid(validate, { type: "sign_out", account_id: "acc_abc123" }, "a sign_out with an extra field");
+  assertInvalid(validate, {}, "a message without the type discriminator");
+});
+
+test("signed_out: valid example passes", async () => {
+  const validate = await loadValidator("signed-out.schema.json");
+  assertValid(validate, { type: "signed_out" }, "a well-formed signed_out");
+});
+
+test("signed_out: only the type discriminator is allowed", async () => {
+  const validate = await loadValidator("signed-out.schema.json");
+  assertInvalid(validate, { type: "signed_out", account_id: "acc_abc123" }, "a signed_out with an extra field");
+  assertInvalid(validate, {}, "a message without the type discriminator");
 });
 
 test("welcome: the update fields are optional, and download_url must be https", async () => {
   const validate = await loadValidator("welcome.schema.json");
-  const base = { type: "welcome", accepted: true, protocol_version: 2, account_id: null };
+  const base = { type: "welcome", accepted: true, protocol_version: 2, accounts: true, account_id: null };
   assertValid(validate, base, "welcome without update fields");
   assertValid(
     validate,

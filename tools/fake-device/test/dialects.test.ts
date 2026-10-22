@@ -35,7 +35,7 @@ async function withStubServer<T>(fn: (url: string, hellos: Record<string, unknow
         hellos.push(msg);
         ws.send(JSON.stringify({ type: "challenge", nonce: Buffer.from("nonce").toString("base64") }));
       } else if (msg["type"] === "challenge_response") {
-        ws.send(JSON.stringify({ type: "welcome", accepted: true, protocol_version: hellos[0]?.["protocol_version"], account_id: null }));
+        ws.send(JSON.stringify({ type: "welcome", accepted: true, protocol_version: hellos[0]?.["protocol_version"], accounts: true, account_id: null }));
       }
     });
   });
@@ -129,7 +129,7 @@ test("registration returns the connector URL once; regenerateSecret() replaces i
     ws.on("message", (raw) => {
       const msg = JSON.parse(String(raw)) as Record<string, unknown>;
       if (msg["type"] === "hello") ws.send(JSON.stringify({ type: "challenge", nonce: "AAAA" }));
-      else if (msg["type"] === "challenge_response") ws.send(JSON.stringify({ type: "welcome", accepted: true, protocol_version: 2, account_id: null }));
+      else if (msg["type"] === "challenge_response") ws.send(JSON.stringify({ type: "welcome", accepted: true, protocol_version: 2, accounts: true, account_id: null }));
       else if (msg["type"] === "regenerate_secret") {
         ws.send(JSON.stringify({ type: "secret_regenerated", connector_url: "https://example.test/d/dtk_second/mcp" }));
       }
@@ -157,7 +157,7 @@ test("regenerateSecret() rejects when not connected", async () => {
   await assert.rejects(device.regenerateSecret(), /not connected/);
 });
 
-test("claimAccount() resolves with account_id on `claimed`, rejects with the reason on `claim_rejected`", async () => {
+test("signIn() resolves with account_id on `signed_in`, rejects with the reason on `sign_in_rejected`", async () => {
   const server = http.createServer((req, res) => {
     if (req.method === "POST" && req.url === "/devices/register") {
       res.writeHead(200, { "content-type": "application/json" }).end("{}");
@@ -171,11 +171,11 @@ test("claimAccount() resolves with account_id on `claimed`, rejects with the rea
     ws.on("message", (raw) => {
       const msg = JSON.parse(String(raw)) as Record<string, unknown>;
       if (msg["type"] === "hello") ws.send(JSON.stringify({ type: "challenge", nonce: "AAAA" }));
-      else if (msg["type"] === "challenge_response") ws.send(JSON.stringify({ type: "welcome", accepted: true, protocol_version: 2, account_id: null }));
-      else if (msg["type"] === "claim_account") {
+      else if (msg["type"] === "challenge_response") ws.send(JSON.stringify({ type: "welcome", accepted: true, protocol_version: 2, accounts: true, account_id: null }));
+      else if (msg["type"] === "sign_in") {
         const token = msg["account_token"] as string;
-        if (token === "good-token") ws.send(JSON.stringify({ type: "claimed", account_id: "acc_test" }));
-        else ws.send(JSON.stringify({ type: "claim_rejected", reason: "invalid_token" }));
+        if (token === "good-token") ws.send(JSON.stringify({ type: "signed_in", account_id: "acc_test" }));
+        else ws.send(JSON.stringify({ type: "sign_in_rejected", reason: "invalid_token" }));
       }
     });
   });
@@ -185,14 +185,14 @@ test("claimAccount() resolves with account_id on `claimed`, rejects with the rea
   try {
     const device = new FakeDevice({ url: `ws://127.0.0.1:${addr.port}/device` });
     await device.connect();
-    assert.equal(device.claimedAccountId, null);
-    assert.equal(await device.claimAccount("good-token", "hint-1"), "acc_test");
-    assert.equal(device.claimedAccountId, "acc_test");
+    assert.equal(device.signedInAccountId, null);
+    assert.equal(await device.signIn("good-token", "hint-1"), "acc_test");
+    assert.equal(device.signedInAccountId, "acc_test");
 
     const other = new FakeDevice({ url: `ws://127.0.0.1:${addr.port}/device` });
     await other.connect();
-    await assert.rejects(other.claimAccount("bad-token", "hint-2"), /invalid_token/);
-    assert.equal(other.claimedAccountId, null);
+    await assert.rejects(other.signIn("bad-token", "hint-2"), /invalid_token/);
+    assert.equal(other.signedInAccountId, null);
     other.close();
     device.close();
   } finally {
@@ -202,12 +202,95 @@ test("claimAccount() resolves with account_id on `claimed`, rejects with the rea
   }
 });
 
-test("claimAccount() rejects when not connected", async () => {
+test("signIn() rejects when not connected", async () => {
   const device = new FakeDevice({ url: "ws://127.0.0.1:1/device" });
-  await assert.rejects(device.claimAccount("x", "hint"), /not connected/);
+  await assert.rejects(device.signIn("x", "hint"), /not connected/);
 });
 
-test("claimAccount() sends install_hint always and replace_device_id when given; list/revoke AI connections round-trip", async () => {
+test("signOut() resolves on `signed_out` and clears the signed-in account", async () => {
+  const server = http.createServer((req, res) => {
+    if (req.method === "POST" && req.url === "/devices/register") {
+      res.writeHead(200, { "content-type": "application/json" }).end("{}");
+      return;
+    }
+    res.writeHead(404).end();
+  });
+  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => SUBPROTOCOL });
+  server.on("upgrade", (req, socket, head) => wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws)));
+  wss.on("connection", (ws) => {
+    ws.on("message", (raw) => {
+      const msg = JSON.parse(String(raw)) as Record<string, unknown>;
+      if (msg["type"] === "hello") ws.send(JSON.stringify({ type: "challenge", nonce: "AAAA" }));
+      else if (msg["type"] === "challenge_response") ws.send(JSON.stringify({ type: "welcome", accepted: true, protocol_version: 2, accounts: true, account_id: null }));
+      else if (msg["type"] === "sign_in") ws.send(JSON.stringify({ type: "signed_in", account_id: "acc_test" }));
+      else if (msg["type"] === "sign_out") ws.send(JSON.stringify({ type: "signed_out" }));
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  const addr = server.address();
+  if (typeof addr !== "object" || addr === null) throw new Error("expected AddressInfo");
+  try {
+    const device = new FakeDevice({ url: `ws://127.0.0.1:${addr.port}/device` });
+    await device.connect();
+    await device.signIn("good-token", "hint-1");
+    assert.equal(device.signedInAccountId, "acc_test");
+    await device.signOut();
+    assert.equal(device.signedInAccountId, null);
+    // Already signed out: the server still replies `signed_out`, and signOut() succeeds.
+    await device.signOut();
+    assert.equal(device.signedInAccountId, null);
+    device.close();
+  } finally {
+    wss.close();
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+test("signOut() rejects when not connected", async () => {
+  const device = new FakeDevice({ url: "ws://127.0.0.1:1/device" });
+  await assert.rejects(device.signOut(), /not connected/);
+});
+
+test("a server without accounts (welcome accounts: false) rejects sign_in with accounts_unsupported", async () => {
+  const server = http.createServer((req, res) => {
+    if (req.method === "POST" && req.url === "/devices/register") {
+      res.writeHead(200, { "content-type": "application/json" }).end("{}");
+      return;
+    }
+    res.writeHead(404).end();
+  });
+  const wss = new WebSocketServer({ noServer: true, handleProtocols: () => SUBPROTOCOL });
+  server.on("upgrade", (req, socket, head) => wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws)));
+  wss.on("connection", (ws) => {
+    ws.on("message", (raw) => {
+      const msg = JSON.parse(String(raw)) as Record<string, unknown>;
+      if (msg["type"] === "hello") ws.send(JSON.stringify({ type: "challenge", nonce: "AAAA" }));
+      else if (msg["type"] === "challenge_response")
+        ws.send(JSON.stringify({ type: "welcome", accepted: true, protocol_version: 2, accounts: false, account_id: null }));
+      else if (msg["type"] === "sign_in") ws.send(JSON.stringify({ type: "sign_in_rejected", reason: "accounts_unsupported" }));
+      else if (msg["type"] === "sign_out") ws.send(JSON.stringify({ type: "signed_out" }));
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  const addr = server.address();
+  if (typeof addr !== "object" || addr === null) throw new Error("expected AddressInfo");
+  try {
+    const device = new FakeDevice({ url: `ws://127.0.0.1:${addr.port}/device` });
+    await device.connect();
+    await assert.rejects(device.signIn("good-token", "hint-1"), /accounts_unsupported/);
+    assert.equal(device.signedInAccountId, null);
+    // Sign-out still works on a server without accounts: the server replies `signed_out`.
+    await device.signOut();
+    device.close();
+  } finally {
+    wss.close();
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+test("signIn() sends install_hint always and replace_device_id when given; list/revoke AI connections round-trip", async () => {
   const sent: Record<string, unknown>[] = [];
   const server = http.createServer((req, res) => {
     if (req.method === "POST" && req.url === "/devices/register") {
@@ -224,19 +307,19 @@ test("claimAccount() sends install_hint always and replace_device_id when given;
       sent.push(msg);
       if (msg["type"] === "hello") ws.send(JSON.stringify({ type: "challenge", nonce: "AAAA" }));
       else if (msg["type"] === "challenge_response")
-        ws.send(JSON.stringify({ type: "welcome", accepted: true, protocol_version: 2, account_id: null }));
-      else if (msg["type"] === "claim_account") {
+        ws.send(JSON.stringify({ type: "welcome", accepted: true, protocol_version: 2, accounts: true, account_id: null }));
+      else if (msg["type"] === "sign_in") {
         if (msg["replace_device_id"] === "dt_missing")
-          ws.send(JSON.stringify({ type: "claim_rejected", reason: "unknown_device" }));
+          ws.send(JSON.stringify({ type: "sign_in_rejected", reason: "unknown_device" }));
         else if (msg["replace_device_id"] === "dt_at_limit")
           ws.send(
             JSON.stringify({
-              type: "claim_rejected",
+              type: "sign_in_rejected",
               reason: "device_limit_reached",
               devices: [{ device_id: "dt_x", name: "Old phone", model: "OnePlus Nord", last_seen: "2026-10-21T09:30:00Z" }],
             }),
           );
-        else ws.send(JSON.stringify({ type: "claimed", account_id: "acc_test" }));
+        else ws.send(JSON.stringify({ type: "signed_in", account_id: "acc_test" }));
       } else if (msg["type"] === "list_ai_connections") {
         if (msg["type"] === "list_ai_connections" && ws === null) return;
         ws.send(
@@ -257,8 +340,8 @@ test("claimAccount() sends install_hint always and replace_device_id when given;
         );
       } else if (msg["type"] === "revoke_ai_connection") {
         if (msg["connection_id"] === "cl_1") ws.send(JSON.stringify({ type: "ai_connection_revoked", ok: true }));
-        else if (msg["connection_id"] === "cl_unclaimed")
-          ws.send(JSON.stringify({ type: "ai_connection_revoked", ok: false, error: { code: "not_claimed" } }));
+        else if (msg["connection_id"] === "cl_signed_out")
+          ws.send(JSON.stringify({ type: "ai_connection_revoked", ok: false, error: { code: "not_signed_in" } }));
         else ws.send(JSON.stringify({ type: "ai_connection_revoked", ok: false, error: { code: "not_found" } }));
       }
     });
@@ -270,24 +353,24 @@ test("claimAccount() sends install_hint always and replace_device_id when given;
     const device = new FakeDevice({ url: `ws://127.0.0.1:${addr.port}/device` });
     await device.connect();
 
-    // claim_account: install_hint always present; replace_device_id only when asked.
-    await device.claimAccount("good-token", "hint-1");
-    const plainClaim = sent.find((m) => m["type"] === "claim_account" && m["install_hint"] === "hint-1");
-    assert.ok(plainClaim, "claim_account sent with install_hint");
-    assert.ok(!("replace_device_id" in (plainClaim as object)), "no replace_device_id unless asked");
+    // sign_in: install_hint always present; replace_device_id only when asked.
+    await device.signIn("good-token", "hint-1");
+    const plainSignIn = sent.find((m) => m["type"] === "sign_in" && m["install_hint"] === "hint-1");
+    assert.ok(plainSignIn, "sign_in sent with install_hint");
+    assert.ok(!("replace_device_id" in (plainSignIn as object)), "no replace_device_id unless asked");
 
     // device_limit_rejected carries devices; unknown_device for a bad replace id.
-    await assert.rejects(device.claimAccount("t", "h", 5000, "dt_at_limit"), /device_limit_reached/);
-    await assert.rejects(device.claimAccount("t", "h", 5000, "dt_missing"), /unknown_device/);
+    await assert.rejects(device.signIn("t", "h", 5000, "dt_at_limit"), /device_limit_reached/);
+    await assert.rejects(device.signIn("t", "h", 5000, "dt_missing"), /unknown_device/);
 
-    // AI connections: list, revoke ok, not_found, not_claimed.
+    // AI connections: list, revoke ok, not_found, not_signed_in.
     const connections = await device.listAiConnections();
     assert.equal(connections.length, 1);
     assert.equal(connections[0]?.client_id, "cl_1");
     assert.equal(connections[0]?.last_used_at, null);
     await device.revokeAiConnection("cl_1");
     await assert.rejects(device.revokeAiConnection("cl_nope"), /not_found/);
-    await assert.rejects(device.revokeAiConnection("cl_unclaimed"), /not_claimed/);
+    await assert.rejects(device.revokeAiConnection("cl_signed_out"), /not_signed_in/);
     device.close();
   } finally {
     wss.close();
@@ -315,7 +398,7 @@ test("a locked device answers device_locked for every step; type_text without a 
       const msg = JSON.parse(String(raw)) as Record<string, unknown>;
       if (msg["type"] === "hello") ws.send(JSON.stringify({ type: "challenge", nonce: "AAAA" }));
       else if (msg["type"] === "challenge_response")
-        ws.send(JSON.stringify({ type: "welcome", accepted: true, protocol_version: 2, account_id: null }));
+        ws.send(JSON.stringify({ type: "welcome", accepted: true, protocol_version: 2, accounts: true, account_id: null }));
       else if (msg["type"] === "result" || msg["type"] === "error") responses.push(msg);
     });
   });

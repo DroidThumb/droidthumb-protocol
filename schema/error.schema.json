@@ -12,7 +12,7 @@
     "code": {
       "type": "string",
       "title": "ErrorCode",
-      "description": "An open string. Known codes: `submit_unsupported` — the phone can't send the keyboard's own action (Search, Go, …) that type_text's submit asks for; `device_locked` — the phone is locked, so the action can't run (every step can return this); `not_claimed` — no account has claimed this phone (an ai_connections_list or ai_connection_revoked error); `not_found` — revoke_ai_connection named a connection that isn't one of the claiming account's connections (an ai_connection_revoked error)."
+      "description": "An open string. Known codes: `submit_unsupported` — the phone can't send the keyboard's own action (Search, Go, …) that type_text's submit asks for; `device_locked` — the phone is locked, so the action can't run (every step can return this); `not_signed_in` — the phone is signed out (an ai_connections_list or ai_connection_revoked error); `not_found` — revoke_ai_connection named a connection that isn't one of the account signed in on this phone's connections (an ai_connection_revoked error)."
     },
     "message": { "type": "string" }
   }

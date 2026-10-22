@@ -1,1 +1,1 @@
-{ "type": "welcome", "accepted": false, "protocol_version": 2, "account_id": "acc_0123456789abcdef" }
+{ "type": "welcome", "accepted": false, "protocol_version": 2, "accounts": true, "account_id": "acc_0123456789abcdef" }

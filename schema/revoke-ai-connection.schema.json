@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schema.droidthumb.com/revoke-ai-connection.json",
   "title": "RevokeAiConnection",
-  "description": "device -> server, sent on an established (challenge-verified) connection to revoke one of the claiming account's AI connections. The server answers with `ai_connection_revoked`; when no account has claimed the phone it answers with ok: false and error code \"not_claimed\", and when connection_id isn't one of the claiming account's connections with \"not_found\".",
+  "description": "device -> server, sent on an established (challenge-verified) connection to revoke one of the account signed in on this phone's AI connections. The server answers with `ai_connection_revoked`; when the phone is signed out it answers with ok: false and error code \"not_signed_in\", and when connection_id isn't one of the account signed in on this phone's connections with \"not_found\".",
   "type": "object",
   "additionalProperties": false,
   "required": ["type", "connection_id"],

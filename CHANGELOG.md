@@ -7,28 +7,43 @@ that doesn't change a schema, a generated type, or a tool this package ships.
 ## 2.0.0
 
 Protocol version 2 — the current and only supported protocol version
-(`{"current": 2, "supported": [2]}`). Version 1 is retired: every schema, message and example now
-describes and uses protocol version 2, and all version 1 examples are gone.
+(`{"current": 2, "supported": [2]}`). Every schema, message and example describes and uses
+protocol version 2.
 
-- **Account claiming and device replacement (`claim_account`/`claimed`/`claim_rejected`).**
-  - `claim_account` (device → server) requires `install_hint` (Android's per-app device ID,
+- **Sign-in and sign-out (`sign_in`/`signed_in`/`sign_in_rejected`, `sign_out`/`signed_out`).**
+  - `sign_in` (device → server) requires `install_hint` (Android's per-app device ID,
     ANDROID_ID; the server keeps only a keyed hash of it and uses it to recognise the same phone
-    after a reinstall) and carries an optional `replace_device_id`. When given, this
-    phone claims the account in place of the device with that id; that device is retired and, if
-    connected, closed with the new WebSocket close code 4004 (`replaced`, exported as
-    `CLOSE_REPLACED` from `src/close-codes.ts`).
-  - `claim_rejected` (server → device) reasons are now `already_claimed`, `invalid_token`,
-    `device_limit_reached` (with a required `devices` array listing the account's current devices:
-    `device_id`, `name`, `model`, `last_seen`) and `unknown_device` (when `replace_device_id`
-    doesn't name one of the account's phones).
-- **AI connection management (new message pair).**
+    after a reinstall) and carries an optional `replace_device_id`. When given, this phone is
+    signed in in place of the device with that id; that device is retired and, if connected,
+    closed with the WebSocket close code 4004 (`replaced`, exported as `CLOSE_REPLACED` from
+    `src/close-codes.ts`). Signing in to a different account moves the phone to that account at
+    once; signing in again with the account the phone is already signed in to succeeds and
+    changes nothing. `account_token` is a short-lived, single-use token the server issues after
+    Google sign-in completes.
+  - `signed_in` (server → device) is the reply to a successful `sign_in`, carrying `account_id`.
+  - `sign_in_rejected` (server → device) reasons are `invalid_token`, `device_limit_reached`
+    (with a required `devices` array listing the account's current devices: `device_id`, `name`,
+    `model`, `last_seen`), `unknown_device` (when `replace_device_id` doesn't name one of the
+    account's phones) and `accounts_unsupported` (this server has no accounts).
+  - `sign_out` (device → server, only `type`) signs the phone out of its account; afterwards the
+    phone belongs to no account and can't be driven. A phone that signed out while offline sends
+    it as soon as its connection is established.
+  - `signed_out` (server → device, only `type`) is the reply to `sign_out`, also sent when the
+    phone was already signed out and by a server without accounts.
+- **Welcome reports whether the server has accounts.** `welcome` carries a required boolean
+  `accounts`: true when this server has accounts (a phone can only be driven through the account
+  signed in on it), false when it has none (every connected phone can be driven, `account_id` is
+  always null, and `sign_in` is rejected with `accounts_unsupported`). `account_id` is the
+  account signed in on this phone, or null when the phone is signed out or the server has no
+  accounts.
+- **AI connection management (message pair).**
   - `list_ai_connections` (device → server) and `ai_connections_list` (server → device) list the
-    claiming account's AI connections (`client_id`, `client_name`, `display_name`, `image_url`,
-    `connected_at`, `last_used_at`).
+    AI connections of the account signed in on this phone (`client_id`, `client_name`,
+    `display_name`, `image_url`, `connected_at`, `last_used_at`).
   - `revoke_ai_connection` (device → server) and `ai_connection_revoked` (server → device) revoke
     one connection by `connection_id`.
-  - Error branches carry `not_claimed` (no account has claimed the phone) or `not_found`
-    (`connection_id` isn't one of the claiming account's connections).
+  - Error branches carry `not_signed_in` (this phone isn't signed in to any account) or
+    `not_found` (`connection_id` isn't one of the account signed in on this phone's connections).
 - **Step changes.**
   - `type_text` params gain `append` (boolean, default false: the text replaces the field's
     content) and `submit` (boolean, default false: after typing, send the keyboard's own action,
@@ -37,14 +52,15 @@ describes and uses protocol version 2, and all version 1 examples are gone.
     locked screen yields no usable tree, so the server can ask the user to unlock).
 - **Error codes.** `schema/error.schema.json` documents `submit_unsupported` (the phone can't send
   the keyboard's own action that `type_text`'s `submit` asks for), `device_locked` (the phone is
-  locked, so the action can't run), `not_claimed` (no account has claimed this phone) and
-  `not_found` (the connection isn't one of the claiming account's connections).
-- **The WebSocket subprotocol is now `droidthumb.v2`** (`SUBPROTOCOL`, exported from this package).
+  locked, so the action can't run), `not_signed_in` (this phone isn't signed in to any account)
+  and `not_found` (the connection isn't one of the account signed in on this phone's connections).
+- **The WebSocket subprotocol is `droidthumb.v2`** (`SUBPROTOCOL`, exported from this package).
 - **Examples.** Every supported version's examples live in `examples/v2/` — one valid and one
-  invalid example per message, covering every new and changed shape: claim reasons (including
-  `device_limit_reached` and `unknown_device`), AI connection list and revoke (including
-  `not_claimed` and `not_found`), `type_text` with `append`/`submit`, `read_screen` with `locked`,
-  and the new error codes.
+  invalid example per message, covering every new and changed shape: sign-in rejection reasons
+  (including `device_limit_reached`, `unknown_device` and `accounts_unsupported`), welcome with
+  `accounts` true and false, sign-out and signed-out, AI connection list and revoke (including
+  `not_signed_in` and `not_found`), `type_text` with `append`/`submit`, `read_screen` with
+  `locked`, and the error codes.
 
 ## M5 — notification trigger endpoint (superseded above, kept for history)
 

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.droidthumb.com/signed-in.json",
+  "title": "SignedIn",
+  "description": "server -> device, the reply to a successful sign_in: either a new sign-in, or a sign-in with the account the phone is already signed in to (which succeeds and changes nothing).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "account_id"],
+  "properties": {
+    "type": { "const": "signed_in" },
+    "account_id": { "type": "string", "minLength": 1 }
+  }
+}

@@ -29,9 +29,9 @@ function assertInvalid(validate: ReturnType<Ajv2020["compile"]>, data: unknown, 
 
 // --- welcome: required account_id ----------------------------------------------------------
 
-test("welcome: account_id is required and may be null (unclaimed phone) or a string", async () => {
+test("welcome: accounts and account_id are required; account_id may be null (signed-out phone) or a string", async () => {
   const validate = await loadValidator("welcome.schema.json");
-  const base = { type: "welcome", accepted: true, protocol_version: 2 };
+  const base = { type: "welcome", accepted: true, protocol_version: 2, accounts: true };
   assertValid(validate, { ...base, account_id: null }, "welcome with account_id null");
   assertValid(validate, { ...base, account_id: "acc_abc123" }, "welcome with an account_id");
   assertInvalid(validate, base, "welcome without account_id");
@@ -40,7 +40,7 @@ test("welcome: account_id is required and may be null (unclaimed phone) or a str
 
 // --- AI connections ------------------------------------------------------------------------
 
-test("ai_connections_list: ok branch carries the connections; error branch carries not_claimed", async () => {
+test("ai_connections_list: ok branch carries the connections; error branch carries not_signed_in", async () => {
   const validate = await loadValidator("ai-connections-list.schema.json");
   assertValid(
     validate,
@@ -62,8 +62,8 @@ test("ai_connections_list: ok branch carries the connections; error branch carri
   );
   assertValid(
     validate,
-    { type: "ai_connections_list", ok: false, error: { code: "not_claimed", message: "no account" } },
-    "an ai_connections_list with not_claimed",
+    { type: "ai_connections_list", ok: false, error: { code: "not_signed_in", message: "no account" } },
+    "an ai_connections_list with not_signed_in",
   );
   assertInvalid(
     validate,
@@ -77,7 +77,7 @@ test("ai_connections_list: ok branch carries the connections; error branch carri
   );
 });
 
-test("revoke_ai_connection requires connection_id; ai_connection_revoked is ok or not_claimed/not_found", async () => {
+test("revoke_ai_connection requires connection_id; ai_connection_revoked is ok or not_signed_in/not_found", async () => {
   const revoke = await loadValidator("revoke-ai-connection.schema.json");
   assertValid(revoke, { type: "revoke_ai_connection", connection_id: "cl_1" }, "a revoke request");
   assertInvalid(revoke, { type: "revoke_ai_connection" }, "a revoke request without connection_id");
@@ -91,8 +91,8 @@ test("revoke_ai_connection requires connection_id; ai_connection_revoked is ok o
   );
   assertValid(
     revoked,
-    { type: "ai_connection_revoked", ok: false, error: { code: "not_claimed" } },
-    "ai_connection_revoked with not_claimed",
+    { type: "ai_connection_revoked", ok: false, error: { code: "not_signed_in" } },
+    "ai_connection_revoked with not_signed_in",
   );
   assertInvalid(
     revoked,

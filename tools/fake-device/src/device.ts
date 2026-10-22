@@ -9,7 +9,7 @@ import type { Override } from "./scenarios.js";
 export interface FakeDeviceOptions {
   url: string;
   /**
-   * What `hello` claims as device_id, for negative tests only (e.g. an id that isn't derived from
+   * What `hello` sends as device_id, for negative tests only (e.g. an id that isn't derived from
    * the key). Default: the id derived from this device's own key, which is the only one a server
    * accepts. The registration request never carries an id.
    */
@@ -83,8 +83,9 @@ export class FakeDevice {
   private registered = false;
   private connectorUrlValue: string | null = null;
   private pendingRegenerate: { resolve: (url: string) => void; reject: (err: Error) => void; timer: NodeJS.Timeout } | null = null;
-  private claimedAccountIdValue: string | null = null;
-  private pendingClaim: { resolve: (accountId: string) => void; reject: (err: Error) => void; timer: NodeJS.Timeout } | null = null;
+  private signedInAccountIdValue: string | null = null;
+  private pendingSignIn: { resolve: (accountId: string) => void; reject: (err: Error) => void; timer: NodeJS.Timeout } | null = null;
+  private pendingSignOut: { resolve: () => void; reject: (err: Error) => void; timer: NodeJS.Timeout } | null = null;
   private pendingList:
     | {
         resolve: (connections: { client_id: string; client_name: string; display_name: string; image_url: string | null; connected_at: string; last_used_at: string | null }[]) => void;
@@ -143,29 +144,29 @@ export class FakeDevice {
     });
   }
 
-  /** The account_id this device was last successfully claimed by, or null if never claimed. */
-  get claimedAccountId(): string | null {
-    return this.claimedAccountIdValue;
+  /** The account_id this phone is signed in to, or null when signed out. */
+  get signedInAccountId(): string | null {
+    return this.signedInAccountIdValue;
   }
 
   /**
-   * Sends `claim_account` over the authenticated connection (design doc D-33) and resolves with the
-   * `account_id` from `claimed`. `installHint` is required (protocol v2). `replaceDeviceId`, when
-   * given, claims this phone in place of that device. Rejects with the rejection reason on
-   * `claim_rejected`, or on no reply within `timeoutMs`.
+   * Sends `sign_in` over the authenticated connection (design doc D-33) and resolves with the
+   * `account_id` from `signed_in`. `installHint` is required (protocol v2). `replaceDeviceId`, when
+   * given, signs this phone in in place of that device. Rejects with the rejection reason on
+   * `sign_in_rejected`, or on no reply within `timeoutMs`.
    */
-  claimAccount(accountToken: string, installHint: string, timeoutMs = 5000, replaceDeviceId?: string): Promise<string> {
+  signIn(accountToken: string, installHint: string, timeoutMs = 5000, replaceDeviceId?: string): Promise<string> {
     const ws = this.ws;
     if (!this.welcomed || !ws) return Promise.reject(new Error("not connected"));
     return new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => {
-        this.pendingClaim = null;
-        reject(new Error("no claimed/claim_rejected reply within timeout"));
+        this.pendingSignIn = null;
+        reject(new Error("no signed_in/sign_in_rejected reply within timeout"));
       }, timeoutMs);
-      this.pendingClaim = { resolve, reject, timer };
+      this.pendingSignIn = { resolve, reject, timer };
       ws.send(
         JSON.stringify({
-          type: "claim_account",
+          type: "sign_in",
           account_token: accountToken,
           install_hint: installHint,
           ...(replaceDeviceId !== undefined ? { replace_device_id: replaceDeviceId } : {}),
@@ -175,9 +176,27 @@ export class FakeDevice {
   }
 
   /**
+   * Sends `sign_out` over the authenticated connection and resolves once the server answers
+   * `signed_out` — including when the phone was already signed out and on a server without
+   * accounts. Rejects on no reply within `timeoutMs`.
+   */
+  signOut(timeoutMs = 5000): Promise<void> {
+    const ws = this.ws;
+    if (!this.welcomed || !ws) return Promise.reject(new Error("not connected"));
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingSignOut = null;
+        reject(new Error("no signed_out reply within timeout"));
+      }, timeoutMs);
+      this.pendingSignOut = { resolve, reject, timer };
+      ws.send(JSON.stringify({ type: "sign_out" }));
+    });
+  }
+
+  /**
    * Sends `list_ai_connections` over the authenticated connection and resolves with the
    * `ai_connections_list` reply (its `connections` on ok). Rejects with the error code on the
-   * error branch (`not_claimed`), or on no reply within `timeoutMs`.
+   * error branch (`not_signed_in`), or on no reply within `timeoutMs`.
    */
   listAiConnections(
     timeoutMs = 5000,
@@ -201,7 +220,7 @@ export class FakeDevice {
   /**
    * Sends `revoke_ai_connection` over the authenticated connection and resolves once the server
    * answers `ai_connection_revoked`. Rejects with the error code on the error branch
-   * (`not_claimed`, `not_found`), or on no reply within `timeoutMs`.
+   * (`not_signed_in`, `not_found`), or on no reply within `timeoutMs`.
    */
   revokeAiConnection(connectionId: string, timeoutMs = 5000): Promise<void> {
     const ws = this.ws;
@@ -319,17 +338,23 @@ export class FakeDevice {
           clearTimeout(pending.timer);
           this.connectorUrlValue = msg.connector_url as string;
           pending.resolve(msg.connector_url as string);
-        } else if (msg.type === "claimed" && this.pendingClaim) {
-          const pending = this.pendingClaim;
-          this.pendingClaim = null;
+        } else if (msg.type === "signed_in" && this.pendingSignIn) {
+          const pending = this.pendingSignIn;
+          this.pendingSignIn = null;
           clearTimeout(pending.timer);
-          this.claimedAccountIdValue = msg.account_id as string;
+          this.signedInAccountIdValue = msg.account_id as string;
           pending.resolve(msg.account_id as string);
-        } else if (msg.type === "claim_rejected" && this.pendingClaim) {
-          const pending = this.pendingClaim;
-          this.pendingClaim = null;
+        } else if (msg.type === "sign_in_rejected" && this.pendingSignIn) {
+          const pending = this.pendingSignIn;
+          this.pendingSignIn = null;
           clearTimeout(pending.timer);
-          pending.reject(new Error(`claim_rejected: ${msg.reason as string}`));
+          pending.reject(new Error(`sign_in_rejected: ${msg.reason as string}`));
+        } else if (msg.type === "signed_out" && this.pendingSignOut) {
+          const pending = this.pendingSignOut;
+          this.pendingSignOut = null;
+          clearTimeout(pending.timer);
+          this.signedInAccountIdValue = null;
+          pending.resolve();
         } else if (msg.type === "ai_connections_list" && this.pendingList) {
           const pending = this.pendingList;
           this.pendingList = null;

@@ -2,5 +2,7 @@
   "type": "welcome",
   "accepted": true,
   "protocol_version": 2,
+  "accounts": true,
+  "account_id": "acc_0123456789abcdef",
   "download_url": "http://example.com/app.apk"
 }

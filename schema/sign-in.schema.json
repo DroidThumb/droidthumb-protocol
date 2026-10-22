@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.droidthumb.com/sign-in.json",
+  "title": "SignIn",
+  "description": "device -> server, on an established (challenge-verified) connection: signs this phone in to the account that account_token belongs to. If the phone is signed in to a different account, it moves to this one at once; signing in again with the account the phone is already signed in to succeeds and changes nothing. The connection itself proves possession of the device's Keystore key, the same pattern regenerate_secret uses, so the message carries no device identifier of its own. account_token is a short-lived, single-use token the server issues after Google sign-in completes — not the OAuth access token itself, so a leaked token can't be replayed for anything beyond the one sign-in it was issued for. install_hint is Android's per-app device ID (ANDROID_ID); the server keeps only a keyed hash of it and uses it to recognise the same phone after a reinstall. replace_device_id, when present, signs this phone in in place of the account's device with that id: that device is retired and, if it is connected, its connection is closed with WS close code 4004 (\"replaced\" — CLOSE_REPLACED, exported from this package).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "account_token", "install_hint"],
+  "properties": {
+    "type": { "const": "sign_in" },
+    "account_token": {
+      "type": "string",
+      "minLength": 1,
+      "description": "A short-lived, single-use token the server issues after Google sign-in completes — not the OAuth access token itself."
+    },
+    "install_hint": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Android's per-app device ID (ANDROID_ID); the server keeps only a keyed hash of it and uses it to recognise the same phone after a reinstall."
+    },
+    "replace_device_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Sign this phone in in place of the account's device with this id. That device is retired and, if connected, its connection is closed with WS close code 4004 (\"replaced\"). A device_id that isn't one of the account's phones is rejected with sign_in_rejected reason \"unknown_device\"."
+    }
+  }
+}
