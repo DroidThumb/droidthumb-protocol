@@ -150,9 +150,9 @@ export class FakeDevice {
   }
 
   /**
-   * Sends `sign_in` over the authenticated connection (design doc D-33) and resolves with the
+   * Sends `sign_in` over the authenticated connection and resolves with the
    * `account_id` from `signed_in`. `installHint` is required (protocol v2). `replaceDeviceId`, when
-   * given, signs this phone in in place of that device. Rejects with the rejection reason on
+   * given, makes this phone take the place of that device. Rejects with the rejection reason on
    * `sign_in_rejected`, or on no reply within `timeoutMs`.
    */
   signIn(accountToken: string, installHint: string, timeoutMs = 5000, replaceDeviceId?: string): Promise<string> {

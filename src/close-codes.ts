@@ -2,8 +2,7 @@
  * WebSocket close codes for the device connection (server -> device).
  *
  * 4000-4003 close the connection during the hello/challenge handshake. 4004 closes an
- * established connection that sign_in's replace_device_id retired — another phone was
- * signed in in its place.
+ * established connection that sign_in's replace_device_id retired — another phone took its place.
  */
 
 /** No hello (or an unparsable/schema-invalid one) as the first message. */

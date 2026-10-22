@@ -36,6 +36,8 @@ test("welcome: accounts and account_id are required; account_id may be null (sig
   assertValid(validate, { ...base, account_id: "acc_abc123" }, "welcome with an account_id");
   assertInvalid(validate, base, "welcome without account_id");
   assertInvalid(validate, { ...base, account_id: 42 }, "welcome with a non-string account_id");
+  assertInvalid(validate, { type: "welcome", accepted: true, protocol_version: 2, account_id: null }, "welcome without accounts");
+  assertValid(validate, { ...base, accounts: false, account_id: null }, "welcome on a server without accounts");
 });
 
 // --- AI connections ------------------------------------------------------------------------

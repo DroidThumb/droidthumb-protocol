@@ -13,9 +13,8 @@ protocol version 2.
 - **Sign-in and sign-out (`sign_in`/`signed_in`/`sign_in_rejected`, `sign_out`/`signed_out`).**
   - `sign_in` (device → server) requires `install_hint` (Android's per-app device ID,
     ANDROID_ID; the server keeps only a keyed hash of it and uses it to recognise the same phone
-    after a reinstall) and carries an optional `replace_device_id`. When given, this phone is
-    signed in in place of the device with that id; that device is retired and, if connected,
-    closed with the WebSocket close code 4004 (`replaced`, exported as `CLOSE_REPLACED` from
+    after a reinstall) and carries an optional `replace_device_id`. When given, this phone takes the place of the device with that id; that
+    device is retired and, if connected, closed with the WebSocket close code 4004 (`replaced`, exported as `CLOSE_REPLACED` from
     `src/close-codes.ts`). Signing in to a different account moves the phone to that account at
     once; signing in again with the account the phone is already signed in to succeeds and
     changes nothing. `account_token` is a short-lived, single-use token the server issues after
@@ -43,7 +42,7 @@ protocol version 2.
   - `revoke_ai_connection` (device → server) and `ai_connection_revoked` (server → device) revoke
     one connection by `connection_id`.
   - Error branches carry `not_signed_in` (this phone isn't signed in to any account) or
-    `not_found` (`connection_id` isn't one of the account signed in on this phone's connections).
+    `not_found` (`connection_id` isn't one of the connections of the account signed in on this phone).
 - **Step changes.**
   - `type_text` params gain `append` (boolean, default false: the text replaces the field's
     content) and `submit` (boolean, default false: after typing, send the keyboard's own action,
@@ -53,7 +52,7 @@ protocol version 2.
 - **Error codes.** `schema/error.schema.json` documents `submit_unsupported` (the phone can't send
   the keyboard's own action that `type_text`'s `submit` asks for), `device_locked` (the phone is
   locked, so the action can't run), `not_signed_in` (this phone isn't signed in to any account)
-  and `not_found` (the connection isn't one of the account signed in on this phone's connections).
+  and `not_found` (the connection isn't one of the connections of the account signed in on this phone).
 - **The WebSocket subprotocol is `droidthumb.v2`** (`SUBPROTOCOL`, exported from this package).
 - **Examples.** Every supported version's examples live in `examples/v2/` — one valid and one
   invalid example per message, covering every new and changed shape: sign-in rejection reasons
