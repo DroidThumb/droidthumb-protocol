@@ -1,15 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schema.droidthumb.com/claim-rejected.json",
-  "title": "ClaimRejected",
-  "description": "server -> device, the reply to a rejected claim_account: the device is already claimed by a different account (\"already_claimed\"), account_token was invalid, expired, or already used (\"invalid_token\"), the account is at its device limit (\"device_limit_reached\", with devices listing the account's current devices so the app can show which one to replace), or replace_device_id named a device that isn't one of the account's phones (\"unknown_device\").",
+  "$id": "https://schema.droidthumb.com/sign-in-rejected.json",
+  "title": "SignInRejected",
+  "description": "server -> device, the reply to a rejected sign_in: account_token was invalid, expired, or already used (\"invalid_token\"), the account is at its device limit (\"device_limit_reached\", with devices listing the account's current devices so the app can show which one to replace), replace_device_id named a device that isn't one of the account's phones (\"unknown_device\"), or this server has no accounts (\"accounts_unsupported\").",
   "type": "object",
   "additionalProperties": false,
   "required": ["type", "reason"],
   "properties": {
-    "type": { "const": "claim_rejected" },
+    "type": { "const": "sign_in_rejected" },
     "reason": {
-      "enum": ["already_claimed", "invalid_token", "device_limit_reached", "unknown_device"]
+      "enum": ["invalid_token", "device_limit_reached", "unknown_device", "accounts_unsupported"]
     },
     "devices": {
       "type": "array",
@@ -38,7 +38,7 @@
     },
     {
       "if": {
-        "properties": { "reason": { "enum": ["already_claimed", "invalid_token", "unknown_device"] } },
+        "properties": { "reason": { "enum": ["invalid_token", "unknown_device", "accounts_unsupported"] } },
         "required": ["reason"]
       },
       "then": { "properties": { "devices": { "$ref": "#/properties/devices" } }, "not": { "required": ["devices"] } }

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.droidthumb.com/sign-out.json",
+  "title": "SignOut",
+  "description": "device -> server, on an established (challenge-verified) connection: signs this phone out of its account. Afterwards the phone belongs to no account and can't be driven. A phone that signed out while offline sends this as soon as its connection is established.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type"],
+  "properties": {
+    "type": { "const": "sign_out" }
+  }
+}

@@ -2,17 +2,21 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schema.droidthumb.com/welcome.json",
   "title": "Welcome",
-  "description": "server -> device, replies to hello once the connection is accepted: a valid hello, followed by a successful challenge/challenge_response (challenge.schema.json). A rejected hello, or a failed challenge, never gets a welcome — the connection is closed with a WS close code instead. account_id is the account that has claimed this phone, or null when the phone is unclaimed.",
+  "description": "server -> device, replies to hello once the connection is accepted: a valid hello, followed by a successful challenge/challenge_response (challenge.schema.json). A rejected hello, or a failed challenge, never gets a welcome — the connection is closed with a WS close code instead. account_id is the account signed in on this phone, or null when the phone is signed out or the server has no accounts.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["type", "accepted", "protocol_version", "account_id"],
+  "required": ["type", "accepted", "protocol_version", "accounts", "account_id"],
   "properties": {
     "type": { "const": "welcome" },
     "accepted": { "const": true },
     "protocol_version": { "type": "integer", "minimum": 1 },
+    "accounts": {
+      "type": "boolean",
+      "description": "true when this server has accounts: a phone can only be driven through the account signed in on it. false when it has none: every connected phone can be driven, account_id is always null, and sign_in is rejected with sign_in_rejected reason \"accounts_unsupported\"."
+    },
     "account_id": {
       "type": ["string", "null"],
-      "description": "The account that has claimed this phone, or null when unclaimed."
+      "description": "The account signed in on this phone, or null when the phone is signed out or the server has no accounts."
     },
     "latest_app_version": { "type": "string", "minLength": 1, "description": "Newest app version the server knows of; the app compares it to its own to decide on an update banner." },
     "minimum_supported_app_version": { "type": "string", "minLength": 1, "description": "Oldest app version the server still supports; an older app shows a blocking update screen." },

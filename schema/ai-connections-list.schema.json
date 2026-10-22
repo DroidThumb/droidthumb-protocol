@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schema.droidthumb.com/ai-connections-list.json",
   "title": "AiConnectionsList",
-  "description": "server -> device, the reply to list_ai_connections. ok: true carries the claiming account's AI connections — the same list the server returns on its account connections page. ok: false carries an error: \"not_claimed\" when no account has claimed this phone.",
+  "description": "server -> device, the reply to list_ai_connections. ok: true carries the AI connections of the account signed in on this phone — the same list the server returns on its account connections page. ok: false carries an error: \"not_signed_in\" when this phone is signed out.",
   "oneOf": [
     {
       "type": "object",
@@ -48,7 +48,7 @@
       "additionalProperties": false,
       "required": ["code"],
       "properties": {
-        "code": { "enum": ["not_claimed"] },
+        "code": { "enum": ["not_signed_in"] },
         "message": { "type": "string" }
       }
     }
