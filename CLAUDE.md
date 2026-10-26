@@ -56,7 +56,12 @@ deletes production data, or anything that needs `sudo`.
 `examples/protocol-versions.json` is the single source of truth for which `protocol_version`s exist
 and which the server accepts (`droidthumb-server` reads it; policy is design doc §9.8 there: N and
 N−1 only). One `examples/v<N>/` directory per supported version, never edited to make a schema change
-pass — see `examples/README.md`. A schema change an already-shipped app would fail on needs a new
-`protocol_version`, not an edit. Any new schema for a wire message needs examples in every supported
-version's directory (and an entry in the required list in `test/protocol-versions.test.ts`), and the
-fake device (`tools/fake-device`) must be able to speak every supported version.
+pass — see `examples/README.md`. **Pre-user exception:** until the first release to anyone outside
+the project, exactly one version is supported and schema changes are made in place within it,
+with no new `protocol_version`; v1 was removed outright on 2026-10-20 on this basis. The first
+release outside the project lapses the exception permanently: from then on a schema change an
+already-shipped app would fail on needs a new `protocol_version`, not an edit, and N and N−1 are
+both supported. Record the lapse in `decisions.md` in `droidthumb-server`. Any new schema for a
+wire message needs examples in every supported version's directory (and an entry in the required
+list in `test/protocol-versions.test.ts`), and the fake device (`tools/fake-device`) must be able
+to speak every supported version.
